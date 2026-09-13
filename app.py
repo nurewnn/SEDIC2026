@@ -22,7 +22,7 @@ st.set_page_config(
 if "detect_mode" not in st.session_state:
     st.session_state.detect_mode = "Image"
 
-MODEL_PATH = "models/guardian.pt"
+MODEL_PATH = "models/best.pt"
 
 # ── Image helpers ─────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
@@ -1189,7 +1189,7 @@ with content_col:
     # ─── IMAGE MODE ───────────────────────────────────────────────────────
     if mode == "Image":
         st.markdown(f'<div class="section-h">{svg_icon("image_detection.svg","ui-svg-icon md")}IMAGE DETECTION</div>', unsafe_allow_html=True)
-        uploaded = st.file_uploader("Upload an image", type=["jpg","jpeg","png"],
+        uploaded = st.file_uploader("Upload an image", type=["jpg","jpeg","png","bmp"],
                                     label_visibility="collapsed")
 
         if uploaded:

@@ -1,6 +1,9 @@
 venv/
+.venv/
 __pycache__/
 *.pt
 outputs/
 *.pyc
 .env
+.matplotlib/
+Ultralytics/
