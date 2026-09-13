@@ -112,7 +112,7 @@ Project/
 │   ├── __init__.py
 │   └── colours.py          # Threat colour + level mapping
 ├── models/
-│   └── guardian.pt         # Trained model weights (not in repo — see below)
+│   └── best.pt         # Trained model weights (not in repo — see below)
 ├── data/
 │   └── qualifier_clip.mp4  # Qualifier video (place here)
 ├── outputs/
@@ -151,10 +151,10 @@ pip install -r requirements.txt
 
 ### 4. Download model weights
 
-`guardian.pt` is not included in this repo due to file size. Download it from the shared Google Drive and place it in the `models/` folder:
+`best.pt` in the `models/` folder:
 
 ```
-models/guardian.pt
+models/best.pt
 ```
 
 > Contact the team for the Drive link.
