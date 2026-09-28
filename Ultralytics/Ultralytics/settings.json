@@ -1,5 +1,5 @@
 {
-  "settings_version": "0.0.7",
+  "settings_version": "0.0.8",
   "datasets_dir": "C:\\Users\\ACER\\Documents\\Hackathon\\SEDIC26\\datasets",
   "weights_dir": "C:\\Users\\ACER\\Documents\\Hackathon\\SEDIC26\\Project\\weights",
   "runs_dir": "C:\\Users\\ACER\\Documents\\Hackathon\\SEDIC26\\Project\\runs",
@@ -11,7 +11,6 @@
   "comet": true,
   "dvc": true,
   "mlflow": true,
-  "neptune": true,
   "raytune": true,
   "tensorboard": false,
   "wandb": false,
