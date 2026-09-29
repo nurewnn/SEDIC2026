@@ -265,12 +265,12 @@ class ReportGenerator:
             resp = httpx.post(
                 "http://localhost:11434/api/generate",
                 json={
-                    "model": os.environ.get("OLLAMA_MODEL", "llama3.2"),
+                    "model": os.environ.get("OLLAMA_MODEL", "llama3.1:8b"),
                     "prompt": prompt,
                     "stream": False,
-                    "options": {"temperature": 0.3, "num_predict": 200},
+                    "options": {"temperature": 0.3, "num_predict": 300},
                 },
-                timeout=15.0,
+                timeout=30.0,
             )
             data = resp.json()
             summary = data.get("response", "").strip()
