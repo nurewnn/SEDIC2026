@@ -105,8 +105,9 @@ Local vs. foreign military distinction is implemented directly in the primary de
 ```
 Project/
 ├── app.py                  # Main Streamlit GUI
-├── detector.py             # YOLOv8 inference wrapper
-├── log_writer.py           # Detection log (CSV) writer
+├── detector.py             # YOLOv8 inference + object tracking wrapper
+├── log_writer.py           # Detection log (CSV) writer with session/tracking data
+├── report_generator.py     # Intelligence pipeline: CSV → Pandas → Charts → Ollama → PDF
 ├── run_qualifier.py        # Standalone qualifier video script
 ├── utils/
 │   ├── __init__.py
@@ -116,7 +117,8 @@ Project/
 ├── data/
 │   └── qualifier_clip.mp4  # Qualifier video (place here)
 ├── outputs/
-│   └── *.csv               # Detection logs (auto-generated)
+│   ├── *.csv               # Detection logs (auto-generated)
+│   └── charts/             # Auto-generated analytics charts (PNG)
 └── requirements.txt
 ```
 
@@ -174,13 +176,15 @@ Open `http://localhost:8501` in your browser.
 | Feature | Description |
 |---|---|
 | **Image mode** | Upload JPG/PNG → instant detection with bounding boxes |
-| **Video mode** | Upload MP4 → real-time frame-by-frame processing |
+| **Video mode** | Upload MP4 → real-time frame-by-frame processing with object tracking |
 | **Qualifier Video mode** | Run model on official qualifier clip → generate submission log |
 | **Military alert** | 🔴 Pulsing red alert for foreign military / 🟠 Orange alert for local military |
 | **Metric cards** | Live count of Total / Military / Civilian / Threats |
+| **Object tracking** | ByteTrack persistent vessel IDs — real tracked vessel counts, not just per-frame detections |
 | **Confidence slider** | Adjust detection threshold (0.01 – 0.95) |
 | **Model diagnostics** | Toggle debug panel showing model info and low-threshold probe |
-| **CSV download** | One-click download of detection log after each run |
+| **CSV download** | One-click download of detection log (with session_id, vessel_id, detection_duration) after each run |
+| **Mission Report (PDF)** | Intelligence pipeline: CSV → Pandas stats → Matplotlib charts → Ollama summary → mission-ready PDF |
 
 ---
 
@@ -190,19 +194,22 @@ All detection runs produce a CSV log with these columns:
 
 | Column | Description |
 |---|---|
+| `session_id` | Unique session identifier (UUID hex) |
 | `timestamp` | UTC timestamp (ISO 8601) |
 | `frame_id` | Frame number (0 for images) |
+| `vessel_id` | Object-tracking ID (ByteTrack, stable across frames) |
 | `class_name` | Detected vessel class |
 | `threat_level` | CIVILIAN / SMALL CRAFT / MONITOR / PRIORITY / HIGH PRIORITY |
 | `confidence` | Model confidence (0.000 – 1.000) |
 | `x1, y1, x2, y2` | Bounding box coordinates (pixels) |
+| `detection_duration` | Seconds this vessel was continuously tracked |
 
 ### Example
 
 ```csv
-timestamp,frame_id,class_name,threat_level,confidence,x1,y1,x2,y2
-2026-08-14T08:32:11.042Z,0,local_military_ship,PRIORITY,0.882,104,87,743,498
-2026-08-14T08:32:11.042Z,0,container_ship,CIVILIAN,0.951,210,300,890,640
+session_id,timestamp,frame_id,vessel_id,class_name,threat_level,confidence,x1,y1,x2,y2,detection_duration
+a1b2c3d4e5f6,2026-08-14T08:32:11.042Z,0,1,local_military_ship,PRIORITY,0.882,104,87,743,498,0.0
+a1b2c3d4e5f6,2026-08-14T08:32:11.042Z,0,2,container_ship,CIVILIAN,0.951,210,300,890,640,0.0
 ```
 
 ---
@@ -314,6 +321,9 @@ opencv-python
 pillow
 httpx
 numpy
+pandas
+matplotlib
+fpdf2
 ```
 
 Install all:

@@ -23,8 +23,9 @@ class GuardianDetector:
     def predict(self, frame: np.ndarray, conf: float | None = None) -> list[dict]:
         """
         Returns a list of detection dicts for one frame.
-        Each dict: {class_name, confidence, bbox, colour, threat_level}
+        Each dict: {class_name, confidence, bbox, colour, threat_level, vessel_id}
         iou=0.5 removes overlapping duplicate boxes on the same vessel.
+        vessel_id is a sequential index (no tracking) for single-frame calls.
         """
         results = self.model.predict(
             frame,
@@ -34,7 +35,7 @@ class GuardianDetector:
         )[0]
 
         detections = []
-        for box in results.boxes:
+        for idx, box in enumerate(results.boxes):
             cls_id   = int(box.cls[0])
             cls_name = self.model.names[cls_id]
             x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -44,8 +45,49 @@ class GuardianDetector:
                 "bbox":         (x1, y1, x2, y2),
                 "colour":       THREAT_COLOURS.get(cls_name, (180, 180, 180)),
                 "threat_level": THREAT_LEVEL.get(cls_name, "UNKNOWN"),
+                "vessel_id":    idx,   # sequential fallback (no tracker)
             })
         return detections
+
+    def track(self, frame: np.ndarray, conf: float | None = None) -> list[dict]:
+        """
+        Returns a list of detection dicts WITH persistent object tracking.
+        Uses Ultralytics built-in ByteTrack (no extra dependencies).
+        Each dict: {class_name, confidence, bbox, colour, threat_level, vessel_id}
+        vessel_id is the tracker-assigned persistent ID (stable across frames).
+
+        Call reset_tracker() before starting a new video/session.
+        """
+        results = self.model.track(
+            frame,
+            conf=self.conf if conf is None else conf,
+            iou=0.5,
+            persist=True,       # keep tracker state across frames
+            verbose=False,
+        )[0]
+
+        detections = []
+        if results.boxes is None or results.boxes.id is None:
+            return detections
+
+        for box in results.boxes:
+            cls_id   = int(box.cls[0])
+            cls_name = self.model.names[cls_id]
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            track_id  = int(box.id[0])   # persistent tracker ID
+            detections.append({
+                "class_name":   cls_name,
+                "confidence":   round(float(box.conf[0]), 3),
+                "bbox":         (x1, y1, x2, y2),
+                "colour":       THREAT_COLOURS.get(cls_name, (180, 180, 180)),
+                "threat_level": THREAT_LEVEL.get(cls_name, "UNKNOWN"),
+                "vessel_id":    track_id,
+            })
+        return detections
+
+    def reset_tracker(self):
+        """Reset the tracking state for a new session."""
+        self.model.predictor = None  # forces fresh tracker init on next track()
 
     def diagnostics(self, frame: np.ndarray, conf: float = 0.01) -> dict:
         """Returns low-threshold model output for troubleshooting."""

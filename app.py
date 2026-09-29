@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 from detector   import GuardianDetector
 from log_writer import DetectionLogger
+from report_generator import ReportGenerator
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 ICON_DIR   = ASSETS_DIR / "icon"
@@ -1171,6 +1172,27 @@ with content_col:
                     key="incident_btn_img"
                 )
 
+            # ── Mission Report PDF (Intelligence Pipeline) ───────────────────
+            st.markdown('<div class="section-h">📊 MISSION REPORT (PDF)</div>', unsafe_allow_html=True)
+            with st.spinner("Generating PDF with charts and analytics…"):
+                try:
+                    rg = ReportGenerator("outputs/single_image_log.csv", session_label=uploaded.name)
+                    rg.load_csv()
+                    rg.compute_stats()
+                    rg.generate_charts()
+                    pdf_bytes = rg.build_pdf_bytes()
+                    st.download_button(
+                        "📥 DOWNLOAD MISSION REPORT (PDF)",
+                        pdf_bytes,
+                        f"mission_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf",
+                        "application/pdf",
+                        use_container_width=False,
+                        key="mission_pdf_btn_img"
+                    )
+                    st.success("✅ Mission report generated successfully.")
+                except Exception as e:
+                    st.warning(f"Report generation failed (non-critical): {e}")
+
            
 
 
@@ -1226,6 +1248,9 @@ with content_col:
             _WINDOW = 10
             budget_s = skip / fps if fps else 0.04
 
+            # Reset tracker state for this video session
+            detector.reset_tracker()
+
             while cap.isOpened():
                 frame_start = time.perf_counter()
 
@@ -1239,7 +1264,7 @@ with content_col:
 
                 if frame_id % skip == 0:
                     t0 = time.perf_counter()
-                    detections = detector.predict(frame)
+                    detections = detector.track(frame)
                     infer_ms   = (time.perf_counter() - t0) * 1000
 
                     annotated     = detector.annotate(frame, detections)
@@ -1293,7 +1318,7 @@ with content_col:
                         ("logging.svg", "Source", source_label),
                     ]}
                     tracking_info = {"title": "OBJECT TRACKING", "rows": [
-                        ("object_tracking.svg", "Tracking", len(detections)),
+                        ("object_tracking.svg", "Tracked Vessels", len({d.get("vessel_id", i) for i, d in enumerate(detections)})),
                         ("classes.svg", "Classes", len(class_counts)),
                         ("threats.svg", "Threat Events", threat_events),
                     ]}
@@ -1324,8 +1349,9 @@ with content_col:
             if log_rows:
                 log_path = f"outputs/video_log_{time.strftime('%Y%m%d_%H%M%S')}.csv"
                 logger = DetectionLogger(log_path)
+                logger.set_fps(fps)
                 for fid, dets in log_rows:
-                    logger.log(fid, dets)
+                    logger.log(fid, dets, fps=fps)
                 logger.close()
                 with open(log_path, "rb") as f:
                     log_data = f.read()
@@ -1365,5 +1391,27 @@ with content_col:
                     use_container_width=False,
                     key="incident_btn_vid"
                 )
+
+            # ── Mission Report PDF (Intelligence Pipeline) ───────────────────
+            if log_data is not None:
+                st.markdown('<div class="section-h">📊 MISSION REPORT (PDF)</div>', unsafe_allow_html=True)
+                with st.spinner("Generating PDF with charts and analytics…"):
+                    try:
+                        rg = ReportGenerator(log_path, session_label=source_label)
+                        rg.load_csv()
+                        rg.compute_stats()
+                        rg.generate_charts()
+                        pdf_bytes = rg.build_pdf_bytes()
+                        st.download_button(
+                            "📥 DOWNLOAD MISSION REPORT (PDF)",
+                            pdf_bytes,
+                            f"mission_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf",
+                            "application/pdf",
+                            use_container_width=False,
+                            key="mission_pdf_btn_vid"
+                        )
+                        st.success("✅ Mission report generated successfully.")
+                    except Exception as e:
+                        st.warning(f"Report generation failed (non-critical): {e}")
 
             st.success(f"✅ Processed {frame_id} frames — session complete.")
