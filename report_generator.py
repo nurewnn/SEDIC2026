@@ -316,6 +316,19 @@ class ReportGenerator:
         pdf.set_text_color(40, 50, 60)
         pdf.cell(29, 5, value, align="R")
 
+    def _metric_row_big(self, pdf, x, y, w, label, value, alt=False):
+        """Larger metric row for the 3-page layout."""
+        bg = (238, 243, 247) if alt else (248, 250, 253)
+        pdf.set_fill_color(*bg)
+        pdf.rect(x, y, w, 9, "F")
+        pdf.set_xy(x + 5, y + 2)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(80, 90, 100)
+        pdf.cell(w - 40, 5, label)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(40, 50, 60)
+        pdf.cell(30, 5, value, align="R")
+
     def _place_image(self, pdf, path, x, y, w):
         """Place an image at (x, y) with width w. Returns the height in mm.
         Also advances the FPDF Y cursor to below the image."""
@@ -336,34 +349,38 @@ class ReportGenerator:
         s = self.stats
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=18)
+
+        # ══════════════════════════════════════════════════════════════════════
+        # PAGE 1: Header + Executive Summary + Key Metrics
+        # ══════════════════════════════════════════════════════════════════════
         pdf.add_page()
         # Header
-        pdf.set_xy(15, 12)
-        pdf.set_font("Helvetica", "B", 18)
+        pdf.set_xy(15, 20)
+        pdf.set_font("Helvetica", "B", 22)
         pdf.set_text_color(26, 107, 138)
-        pdf.cell(0, 8, "PROJECT GUARDIAN")
-        pdf.set_xy(15, 21)
-        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 10, "PROJECT GUARDIAN")
+        pdf.set_xy(15, 32)
+        pdf.set_font("Helvetica", "", 11)
         pdf.set_text_color(80, 100, 120)
-        pdf.cell(0, 5, "Maritime Domain Awareness - Mission Report")
+        pdf.cell(0, 6, "Maritime Domain Awareness - Mission Report")
         pdf.set_draw_color(26, 107, 138)
-        pdf.set_line_width(0.4)
-        pdf.line(15, 28, 195, 28)
+        pdf.set_line_width(0.5)
+        pdf.line(15, 42, 195, 42)
         # Session metadata
-        pdf.set_xy(15, 31)
-        pdf.set_font("Helvetica", "", 7.5)
+        pdf.set_xy(15, 47)
+        pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(120, 130, 140)
         meta = (f"Session: {s.get('session_id', 'N/A')}    |    "
                 f"Generated: {s.get('timestamp', 'N/A')}    |    "
                 f"Source: {self._sanitize(self.session_label)}")
-        pdf.cell(0, 4, meta)
+        pdf.cell(0, 5, meta)
         # Executive Summary
-        self._section_header(pdf, "EXECUTIVE SUMMARY", y=39)
-        pdf.set_font("Helvetica", "", 9)
+        self._section_header(pdf, "EXECUTIVE SUMMARY", y=60)
+        pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(50, 55, 65)
-        pdf.multi_cell(180, 5, summary)
-        pdf.ln(3)
-        # Key Metrics (2-column grid)
+        pdf.multi_cell(180, 6, summary)
+        pdf.ln(5)
+        # Key Metrics (2-column grid, larger rows)
         self._section_header(pdf, "KEY METRICS")
         avg_str = f"{s.get('avg_confidence', 0):.1%}" if isinstance(s.get("avg_confidence"), (int, float)) else "N/A"
         min_str = f"{s.get('min_confidence', 0):.1%}" if isinstance(s.get("min_confidence"), (int, float)) else "N/A"
@@ -382,75 +399,124 @@ class ReportGenerator:
             ("Threat Contact Ratio", f"{s.get('threat_ratio', 0)}%"),
         ]
         start_y = pdf.get_y()
+        row_h = 9
         for i, (label, value) in enumerate(metrics_left):
-            self._metric_row_at(pdf, 15, start_y + i * 6.5, 87, label, value, alt=(i % 2 == 0))
+            self._metric_row_big(pdf, 15, start_y + i * row_h, 87, label, value, alt=(i % 2 == 0))
         for i, (label, value) in enumerate(metrics_right):
-            self._metric_row_at(pdf, 108, start_y + i * 6.5, 87, label, value, alt=(i % 2 == 0))
+            self._metric_row_big(pdf, 108, start_y + i * row_h, 87, label, value, alt=(i % 2 == 0))
         max_rows = max(len(metrics_left), len(metrics_right))
-        pdf.set_y(start_y + max_rows * 6.5 + 4)
-        # Charts: threat pie + class bar side-by-side
-        self._section_header(pdf, "ANALYTICS")
+        pdf.set_y(start_y + max_rows * row_h + 5)
+        # Duration stats if available
+        if s.get("duration_stats"):
+            ds = s["duration_stats"]
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(100, 110, 120)
+            pdf.cell(0, 6, f"Tracking Duration - Avg: {ds['avg_duration']}s  |  "
+                          f"Max: {ds['max_duration']}s  |  Min: {ds['min_duration']}s")
+
+        # ══════════════════════════════════════════════════════════════════════
+        # PAGE 2: Charts (full-size, well-spaced)
+        # ══════════════════════════════════════════════════════════════════════
+        pdf.add_page()
+        # Page 2 header
+        pdf.set_xy(15, 15)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(26, 107, 138)
+        pdf.cell(0, 7, "ANALYTICS")
+        pdf.set_draw_color(26, 107, 138)
+        pdf.set_line_width(0.3)
+        pdf.line(15, 24, 195, 24)
+        pdf.ln(5)
+
+        # Threat pie + class bar side-by-side (larger)
         pie_path = self.chart_paths.get("threat_pie")
         bar_path = self.chart_paths.get("class_bar")
         charts_y = pdf.get_y()
         placed_h = 0
         if pie_path and Path(pie_path).exists():
-            h = self._place_image(pdf, pie_path, x=20, y=charts_y, w=65)
+            h = self._place_image(pdf, pie_path, x=15, y=charts_y, w=85)
             placed_h = max(placed_h, h)
         if bar_path and Path(bar_path).exists():
-            h2 = self._place_image(pdf, bar_path, x=100, y=charts_y, w=85)
+            h2 = self._place_image(pdf, bar_path, x=110, y=charts_y, w=85)
             placed_h = max(placed_h, h2)
-        pdf.set_y(charts_y + placed_h + 5)
-        # Confidence histogram (centered)
+        pdf.set_y(charts_y + placed_h + 10)
+
+        # Confidence histogram (centered, larger)
         hist_path = self.chart_paths.get("conf_hist")
         if hist_path and Path(hist_path).exists():
             hy = pdf.get_y()
-            h3 = self._place_image(pdf, hist_path, x=45, y=hy, w=110)
-            pdf.set_y(hy + h3 + 5)
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_text_color(26, 107, 138)
+            pdf.cell(0, 6, "Confidence Distribution")
+            pdf.ln(2)
+            hy = pdf.get_y()
+            h3 = self._place_image(pdf, hist_path, x=25, y=hy, w=160)
+            pdf.set_y(hy + h3 + 10)
+
         # Timeline (full width, only for video)
         tl_path = self.chart_paths.get("timeline")
         if tl_path and Path(tl_path).exists():
             ty = pdf.get_y()
-            h4 = self._place_image(pdf, tl_path, x=20, y=ty, w=170)
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_text_color(26, 107, 138)
+            pdf.cell(0, 6, "Detection Timeline")
+            pdf.ln(2)
+            ty = pdf.get_y()
+            h4 = self._place_image(pdf, tl_path, x=15, y=ty, w=180)
             pdf.set_y(ty + h4 + 5)
-        # Per-class breakdown
+
+        # ══════════════════════════════════════════════════════════════════════
+        # PAGE 3: Per-class breakdown table
+        # ══════════════════════════════════════════════════════════════════════
         if s.get("per_class_conf"):
-            if pdf.get_y() > 250:
-                pdf.add_page()
-            self._section_header(pdf, "PER-CLASS BREAKDOWN")
+            pdf.add_page()
+            # Page 3 header
+            pdf.set_xy(15, 15)
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_text_color(26, 107, 138)
+            pdf.cell(0, 7, "PER-CLASS BREAKDOWN")
+            pdf.set_draw_color(26, 107, 138)
+            pdf.set_line_width(0.3)
+            pdf.line(15, 24, 195, 24)
+            pdf.ln(8)
+
+            # Table header
             hdr_y = pdf.get_y()
             pdf.set_fill_color(230, 238, 242)
-            pdf.rect(15, hdr_y, 180, 7, "F")
-            pdf.set_xy(18, hdr_y + 1)
-            pdf.set_font("Helvetica", "B", 8)
+            pdf.rect(15, hdr_y, 180, 9, "F")
+            pdf.set_xy(18, hdr_y + 1.5)
+            pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(26, 107, 138)
-            pdf.cell(70, 5, "Vessel Class")
-            pdf.cell(25, 5, "Count", align="C")
-            pdf.cell(25, 5, "Avg Conf", align="C")
-            pdf.cell(25, 5, "Min Conf", align="C")
-            pdf.cell(25, 5, "Max Conf", align="C")
-            pdf.ln(7)
-            pdf.set_font("Helvetica", "", 8)
+            pdf.cell(70, 6, "Vessel Class")
+            pdf.cell(25, 6, "Count", align="C")
+            pdf.cell(25, 6, "Avg Conf", align="C")
+            pdf.cell(25, 6, "Min Conf", align="C")
+            pdf.cell(25, 6, "Max Conf", align="C")
+            pdf.ln(9)
+
+            # Table rows
+            pdf.set_font("Helvetica", "", 9)
+            row_h = 8
             for i, (cls, vals) in enumerate(
                 sorted(s["per_class_conf"].items(), key=lambda x: -x[1]["count"])
             ):
                 row_bg = (245, 248, 250) if i % 2 == 0 else (250, 252, 254)
                 y = pdf.get_y()
                 pdf.set_fill_color(*row_bg)
-                pdf.rect(15, y, 180, 6.5, "F")
-                pdf.set_xy(18, y + 1)
+                pdf.rect(15, y, 180, row_h, "F")
+                pdf.set_xy(18, y + 1.5)
                 pdf.set_text_color(50, 55, 65)
                 pdf.cell(70, 5, cls.replace("_", " ").title())
                 pdf.cell(25, 5, str(vals["count"]), align="C")
                 pdf.cell(25, 5, f"{vals['avg_conf']:.1%}", align="C")
                 pdf.cell(25, 5, f"{vals['min_conf']:.1%}", align="C")
                 pdf.cell(25, 5, f"{vals['max_conf']:.1%}", align="C")
-                pdf.ln(6.5)
-        # Footer - place at bottom of current page, disable auto-break
+                pdf.ln(row_h)
+
+        # Footer on last page
         pdf.set_auto_page_break(auto=False)
-        y_pos = min(pdf.get_y() + 5, 280)
-        pdf.set_xy(15, y_pos)
-        pdf.set_font("Helvetica", "", 6.5)
+        pdf.set_xy(15, 285)
+        pdf.set_font("Helvetica", "", 7)
         pdf.set_text_color(180, 185, 190)
         pdf.cell(0, 4, "Project Guardian - SEDIC 2026 | Maritime Domain Awareness",
                  align="C", link="https://github.com/nurewnn/SEDIC2026")
