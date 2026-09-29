@@ -143,53 +143,51 @@ class ReportGenerator:
         threat_data = [v for v in threat_vals if v > 0]
         colors = [THREAT_COLORS.get(k, "#888888") for k in threat_labels]
         if threat_data:
-            fig, ax = plt.subplots(figsize=(3.2, 2.8))
+            fig, ax = plt.subplots(figsize=(3.5, 2))
             wedges, texts, autotexts = ax.pie(
-                threat_data, labels=None, autopct="%1.0f%%",
-                colors=colors, startangle=90, textprops={"fontsize": 7},
-                wedgeprops={"edgecolor": DARK_BG, "linewidth": 1.2, "width": 0.45})
+                threat_data, labels=threat_labels, autopct="%1.0f%%",
+                colors=colors, startangle=90, textprops={"fontsize": 5.5},
+                wedgeprops={"edgecolor": "white", "linewidth": 1, "width": 0.45},
+                pctdistance=0.7, labeldistance=1.12)
             for t in autotexts:
-                t.set_color("#000000"); t.set_fontsize(7); t.set_fontweight("bold")
-            ax.legend(wedges, [f"{l} ({v})" for l, v in zip(threat_labels, threat_data)],
-                      loc="center", fontsize=6.5, frameon=False,
-                      labelcolor=ACCENT_SOFT, ncol=1, bbox_to_anchor=(0.5, -0.15))
-            ax.set_title("Threat Distribution", fontweight="bold", fontsize=9, pad=6)
+                t.set_color("#000000"); t.set_fontsize(5.5); t.set_fontweight("bold")
+            ax.set_title("Threat Distribution", fontweight="bold", fontsize=7, pad=1)
             fig.tight_layout()
             path = str(self._chart_dir / "threat_pie.png")
-            fig.savefig(path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=150)
+            fig.savefig(path, bbox_inches="tight", facecolor="white", dpi=150, pad_inches=0.02)
             plt.close(fig); charts["threat_pie"] = path
         # Chart 2: Per-class counts (horizontal bar, compact)
         class_counts = df["class_name"].value_counts().sort_values(ascending=True)
-        fig, ax = plt.subplots(figsize=(3.8, 2.5))
+        fig, ax = plt.subplots(figsize=(3.5, 2))
         bars = ax.barh(class_counts.index, class_counts.values, color=ACCENT,
-                       edgecolor=DARK_BG, height=0.55)
-        ax.set_xlabel("Count", fontsize=7)
-        ax.set_title("Detections by Class", fontweight="bold", fontsize=9, pad=6)
-        ax.tick_params(labelsize=6.5)
+                       edgecolor="white", height=0.55)
+        ax.set_xlabel("Count", fontsize=6)
+        ax.set_title("Detections by Class", fontweight="bold", fontsize=7, pad=2)
+        ax.tick_params(labelsize=5.5)
         for bar in bars:
             w = bar.get_width()
-            ax.text(w + 0.15, bar.get_y() + bar.get_height() / 2,
-                    str(int(w)), va="center", fontsize=6.5, color=ACCENT_SOFT)
+            ax.text(w + 0.1, bar.get_y() + bar.get_height() / 2,
+                    str(int(w)), va="center", fontsize=5.5, color="#444444")
         ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
         fig.tight_layout()
         path = str(self._chart_dir / "class_bar.png")
-        fig.savefig(path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=150)
+        fig.savefig(path, bbox_inches="tight", facecolor="white", dpi=150, pad_inches=0.02)
         plt.close(fig); charts["class_bar"] = path
         # Chart 3: Confidence distribution (histogram, compact)
         if "confidence" in df.columns and len(df["confidence"]) >= 2:
-            fig, ax = plt.subplots(figsize=(3.8, 2.2))
+            fig, ax = plt.subplots(figsize=(4.5, 1.8))
             ax.hist(df["confidence"], bins=min(15, len(df)), color=ACCENT,
-                    edgecolor=DARK_BG, alpha=0.85)
-            ax.set_xlabel("Confidence", fontsize=7); ax.set_ylabel("Count", fontsize=7)
-            ax.tick_params(labelsize=6.5)
+                    edgecolor="white", alpha=0.85)
+            ax.set_xlabel("Confidence", fontsize=6); ax.set_ylabel("Count", fontsize=6)
+            ax.tick_params(labelsize=5.5)
             mean_val = df["confidence"].mean()
             ax.axvline(mean_val, color=ORANGE, linestyle="--", linewidth=1,
                        label=f"Mean: {mean_val:.1%}")
-            ax.legend(fontsize=6, frameon=False, labelcolor=ACCENT_SOFT)
+            ax.legend(fontsize=5, frameon=False, labelcolor="#444444")
             ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
             fig.tight_layout()
             path = str(self._chart_dir / "conf_hist.png")
-            fig.savefig(path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=150)
+            fig.savefig(path, bbox_inches="tight", facecolor="white", dpi=150, pad_inches=0.02)
             plt.close(fig); charts["conf_hist"] = path
         # Chart 4: Detection timeline (only for video with >1 frame)
         if "frame_id" in df.columns and df["frame_id"].nunique() > 1:
@@ -203,7 +201,7 @@ class ReportGenerator:
             ax.spines["top"].set_visible(False); ax.spines["right"].set_visible(False)
             fig.tight_layout()
             path = str(self._chart_dir / "timeline.png")
-            fig.savefig(path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=150)
+            fig.savefig(path, bbox_inches="tight", facecolor="white", dpi=150)
             plt.close(fig); charts["timeline"] = path
         self.chart_paths = charts
         return charts
@@ -318,6 +316,17 @@ class ReportGenerator:
         pdf.set_text_color(40, 50, 60)
         pdf.cell(29, 5, value, align="R")
 
+    def _place_image(self, pdf, path, x, y, w):
+        """Place an image at (x, y) with width w. Returns the height in mm.
+        Also advances the FPDF Y cursor to below the image."""
+        from PIL import Image as PILImage
+        img = PILImage.open(path)
+        aspect = img.height / img.width
+        h = w * aspect
+        pdf.image(path, x=x, y=y, w=w)
+        pdf.set_xy(x, y + h)
+        return h
+
     def build_pdf(self):
         if not self.stats:
             self.compute_stats()
@@ -328,7 +337,6 @@ class ReportGenerator:
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=18)
         pdf.add_page()
-        # White background - no fill needed, page is white by default
         # Header
         pdf.set_xy(15, 12)
         pdf.set_font("Helvetica", "B", 18)
@@ -355,7 +363,7 @@ class ReportGenerator:
         pdf.set_text_color(50, 55, 65)
         pdf.multi_cell(180, 5, summary)
         pdf.ln(3)
-        # Key Metrics
+        # Key Metrics (2-column grid)
         self._section_header(pdf, "KEY METRICS")
         avg_str = f"{s.get('avg_confidence', 0):.1%}" if isinstance(s.get("avg_confidence"), (int, float)) else "N/A"
         min_str = f"{s.get('min_confidence', 0):.1%}" if isinstance(s.get("min_confidence"), (int, float)) else "N/A"
@@ -379,34 +387,36 @@ class ReportGenerator:
         for i, (label, value) in enumerate(metrics_right):
             self._metric_row_at(pdf, 108, start_y + i * 6.5, 87, label, value, alt=(i % 2 == 0))
         max_rows = max(len(metrics_left), len(metrics_right))
-        pdf.set_y(start_y + max_rows * 6.5 + 2)
-        # Charts side-by-side
+        pdf.set_y(start_y + max_rows * 6.5 + 4)
+        # Charts: threat pie + class bar side-by-side
         self._section_header(pdf, "ANALYTICS")
         pie_path = self.chart_paths.get("threat_pie")
         bar_path = self.chart_paths.get("class_bar")
         charts_y = pdf.get_y()
+        placed_h = 0
         if pie_path and Path(pie_path).exists():
-            pdf.image(pie_path, x=18, y=charts_y, w=78)
+            h = self._place_image(pdf, pie_path, x=20, y=charts_y, w=65)
+            placed_h = max(placed_h, h)
         if bar_path and Path(bar_path).exists():
-            pdf.image(bar_path, x=108, y=charts_y, w=82)
-        pdf.set_y(charts_y + 48 + 3)
-        # Confidence histogram
+            h2 = self._place_image(pdf, bar_path, x=100, y=charts_y, w=85)
+            placed_h = max(placed_h, h2)
+        pdf.set_y(charts_y + placed_h + 5)
+        # Confidence histogram (centered)
         hist_path = self.chart_paths.get("conf_hist")
         if hist_path and Path(hist_path).exists():
-            pdf.set_x(15)
-            pdf.image(hist_path, x=35, y=pdf.get_y(), w=120)
-            pdf.set_y(pdf.get_y() + 32 + 3)
-        # Timeline
+            hy = pdf.get_y()
+            h3 = self._place_image(pdf, hist_path, x=45, y=hy, w=110)
+            pdf.set_y(hy + h3 + 5)
+        # Timeline (full width, only for video)
         tl_path = self.chart_paths.get("timeline")
         if tl_path and Path(tl_path).exists():
-            pdf.set_x(15)
-            pdf.image(tl_path, x=20, y=pdf.get_y(), w=170)
-            pdf.set_y(pdf.get_y() + 28 + 3)
+            ty = pdf.get_y()
+            h4 = self._place_image(pdf, tl_path, x=20, y=ty, w=170)
+            pdf.set_y(ty + h4 + 5)
         # Per-class breakdown
         if s.get("per_class_conf"):
-            if pdf.get_y() > 245:
+            if pdf.get_y() > 250:
                 pdf.add_page()
-                # White background - no fill needed
             self._section_header(pdf, "PER-CLASS BREAKDOWN")
             hdr_y = pdf.get_y()
             pdf.set_fill_color(230, 238, 242)
@@ -436,12 +446,15 @@ class ReportGenerator:
                 pdf.cell(25, 5, f"{vals['min_conf']:.1%}", align="C")
                 pdf.cell(25, 5, f"{vals['max_conf']:.1%}", align="C")
                 pdf.ln(6.5)
-        # Footer
-        pdf.set_y(-15)
+        # Footer - place at bottom of current page, disable auto-break
+        pdf.set_auto_page_break(auto=False)
+        y_pos = min(pdf.get_y() + 5, 280)
+        pdf.set_xy(15, y_pos)
         pdf.set_font("Helvetica", "", 6.5)
-        pdf.set_text_color(150, 160, 170)
-        pdf.cell(0, 5, "Project Guardian - SEDIC 2026 | Maritime Domain Awareness",
+        pdf.set_text_color(180, 185, 190)
+        pdf.cell(0, 4, "Project Guardian - SEDIC 2026 | Maritime Domain Awareness",
                  align="C", link="https://github.com/nurewnn/SEDIC2026")
+        pdf.set_auto_page_break(auto=True, margin=18)
         return bytes(pdf.output(dest="S"))
 
     def build_pdf_bytes(self):
