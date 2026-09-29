@@ -22,16 +22,16 @@ import matplotlib.pyplot as plt
 from fpdf import FPDF
 
 
-# -- Chart styling -------------------------------------------------------------
+# -- Chart styling (white background for print) --------------------------------
 plt.rcParams.update({
-    "figure.facecolor":  "#0a121e",
-    "axes.facecolor":    "#0d1825",
-    "axes.edgecolor":    "#1e3a4a",
-    "axes.labelcolor":   "#b8d0dc",
-    "xtick.color":       "#7192a5",
-    "ytick.color":       "#7192a5",
-    "text.color":        "#edf7fb",
-    "axes.titlecolor":   "#35d7f3",
+    "figure.facecolor":  "white",
+    "axes.facecolor":    "white",
+    "axes.edgecolor":    "#cccccc",
+    "axes.labelcolor":   "#333333",
+    "xtick.color":       "#666666",
+    "ytick.color":       "#666666",
+    "text.color":        "#222222",
+    "axes.titlecolor":   "#1a6b8a",
     "font.size":         8,
     "axes.titlesize":    9,
     "axes.labelsize":    8,
@@ -39,19 +39,19 @@ plt.rcParams.update({
     "font.family":       "sans-serif",
 })
 
-ACCENT      = "#35d7f3"
-ACCENT_SOFT = "#9beeff"
-GREEN       = "#29e58c"
-RED         = "#ff555d"
-ORANGE      = "#ffae4a"
-YELLOW      = "#ffd700"
-DARK_BG     = "#0d1825"
+ACCENT      = "#1a6b8a"   # dark teal (printable)
+ACCENT_SOFT = "#3a8db0"
+GREEN       = "#2d9d5f"
+RED         = "#cc3333"
+ORANGE      = "#e88a3a"
+YELLOW      = "#d4a017"
+DARK_BG     = "#f5f5f5"   # light grey for edges
 
 THREAT_COLORS = {
     "HIGH PRIORITY": RED,
     "PRIORITY":      ORANGE,
     "MONITOR":       YELLOW,
-    "SMALL CRAFT":   "#ccaa00",
+    "SMALL CRAFT":   "#b8a020",
     "CIVILIAN":      GREEN,
 }
 
@@ -297,25 +297,25 @@ class ReportGenerator:
         if y is not None:
             pdf.set_xy(15, y)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.set_text_color(53, 215, 243)
+        pdf.set_text_color(26, 107, 138)
         pdf.cell(0, 7, title)
         pdf.ln(1)
-        pdf.set_draw_color(53, 215, 243)
+        pdf.set_draw_color(26, 107, 138)
         pdf.set_line_width(0.3)
         y_line = pdf.get_y()
         pdf.line(15, y_line, 195, y_line)
         pdf.ln(3)
 
     def _metric_row_at(self, pdf, x, y, w, label, value, alt=False):
-        bg = (6, 16, 28) if alt else (10, 22, 36)
+        bg = (240, 245, 248) if alt else (248, 250, 252)
         pdf.set_fill_color(*bg)
         pdf.rect(x, y, w, 6.5, "F")
         pdf.set_xy(x + 3, y + 1)
         pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(155, 238, 255)
+        pdf.set_text_color(80, 90, 100)
         pdf.cell(w - 35, 5, label)
         pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(237, 247, 251)
+        pdf.set_text_color(40, 50, 60)
         pdf.cell(29, 5, value, align="R")
 
     def build_pdf(self):
@@ -328,24 +328,23 @@ class ReportGenerator:
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=18)
         pdf.add_page()
-        pdf.set_fill_color(7, 15, 24)
-        pdf.rect(0, 0, 210, 297, "F")
+        # White background - no fill needed, page is white by default
         # Header
         pdf.set_xy(15, 12)
         pdf.set_font("Helvetica", "B", 18)
-        pdf.set_text_color(53, 215, 243)
+        pdf.set_text_color(26, 107, 138)
         pdf.cell(0, 8, "PROJECT GUARDIAN")
         pdf.set_xy(15, 21)
         pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(155, 238, 255)
+        pdf.set_text_color(80, 100, 120)
         pdf.cell(0, 5, "Maritime Domain Awareness - Mission Report")
-        pdf.set_draw_color(53, 215, 243)
+        pdf.set_draw_color(26, 107, 138)
         pdf.set_line_width(0.4)
         pdf.line(15, 28, 195, 28)
         # Session metadata
         pdf.set_xy(15, 31)
         pdf.set_font("Helvetica", "", 7.5)
-        pdf.set_text_color(113, 146, 165)
+        pdf.set_text_color(120, 130, 140)
         meta = (f"Session: {s.get('session_id', 'N/A')}    |    "
                 f"Generated: {s.get('timestamp', 'N/A')}    |    "
                 f"Source: {self._sanitize(self.session_label)}")
@@ -353,7 +352,7 @@ class ReportGenerator:
         # Executive Summary
         self._section_header(pdf, "EXECUTIVE SUMMARY", y=39)
         pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(220, 235, 245)
+        pdf.set_text_color(50, 55, 65)
         pdf.multi_cell(180, 5, summary)
         pdf.ln(3)
         # Key Metrics
@@ -407,15 +406,14 @@ class ReportGenerator:
         if s.get("per_class_conf"):
             if pdf.get_y() > 245:
                 pdf.add_page()
-                pdf.set_fill_color(7, 15, 24)
-                pdf.rect(0, 0, 210, 297, "F")
+                # White background - no fill needed
             self._section_header(pdf, "PER-CLASS BREAKDOWN")
             hdr_y = pdf.get_y()
-            pdf.set_fill_color(10, 30, 48)
+            pdf.set_fill_color(230, 238, 242)
             pdf.rect(15, hdr_y, 180, 7, "F")
             pdf.set_xy(18, hdr_y + 1)
             pdf.set_font("Helvetica", "B", 8)
-            pdf.set_text_color(53, 215, 243)
+            pdf.set_text_color(26, 107, 138)
             pdf.cell(70, 5, "Vessel Class")
             pdf.cell(25, 5, "Count", align="C")
             pdf.cell(25, 5, "Avg Conf", align="C")
@@ -426,12 +424,12 @@ class ReportGenerator:
             for i, (cls, vals) in enumerate(
                 sorted(s["per_class_conf"].items(), key=lambda x: -x[1]["count"])
             ):
-                row_bg = (6, 16, 28) if i % 2 == 0 else (10, 22, 36)
+                row_bg = (245, 248, 250) if i % 2 == 0 else (250, 252, 254)
                 y = pdf.get_y()
                 pdf.set_fill_color(*row_bg)
                 pdf.rect(15, y, 180, 6.5, "F")
                 pdf.set_xy(18, y + 1)
-                pdf.set_text_color(237, 247, 251)
+                pdf.set_text_color(50, 55, 65)
                 pdf.cell(70, 5, cls.replace("_", " ").title())
                 pdf.cell(25, 5, str(vals["count"]), align="C")
                 pdf.cell(25, 5, f"{vals['avg_conf']:.1%}", align="C")
@@ -441,7 +439,7 @@ class ReportGenerator:
         # Footer
         pdf.set_y(-15)
         pdf.set_font("Helvetica", "", 6.5)
-        pdf.set_text_color(80, 100, 120)
+        pdf.set_text_color(150, 160, 170)
         pdf.cell(0, 5, "Project Guardian - SEDIC 2026 | Maritime Domain Awareness",
                  align="C", link="https://github.com/nurewnn/SEDIC2026")
         return bytes(pdf.output(dest="S"))
