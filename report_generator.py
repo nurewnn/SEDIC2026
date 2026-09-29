@@ -444,11 +444,10 @@ class ReportGenerator:
         # Confidence histogram (centered, larger)
         hist_path = self.chart_paths.get("conf_hist")
         if hist_path and Path(hist_path).exists():
-            hy = pdf.get_y()
             pdf.set_font("Helvetica", "B", 10)
             pdf.set_text_color(26, 107, 138)
             pdf.cell(0, 6, "Confidence Distribution")
-            pdf.ln(2)
+            pdf.ln(8)  # advance past the title text
             hy = pdf.get_y()
             h3 = self._place_image(pdf, hist_path, x=25, y=hy, w=160)
             pdf.set_y(hy + h3 + 10)
@@ -456,11 +455,10 @@ class ReportGenerator:
         # Timeline (full width, only for video)
         tl_path = self.chart_paths.get("timeline")
         if tl_path and Path(tl_path).exists():
-            ty = pdf.get_y()
             pdf.set_font("Helvetica", "B", 10)
             pdf.set_text_color(26, 107, 138)
             pdf.cell(0, 6, "Detection Timeline")
-            pdf.ln(2)
+            pdf.ln(8)  # advance past the title text
             ty = pdf.get_y()
             h4 = self._place_image(pdf, tl_path, x=15, y=ty, w=180)
             pdf.set_y(ty + h4 + 5)
