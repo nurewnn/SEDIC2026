@@ -1246,6 +1246,12 @@ with content_col:
             annotated     = detector.annotate(frame_bgr, detections)
             annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
 
+            # Save annotated image for the mission report
+            import os as _os
+            _os.makedirs("outputs/annotated", exist_ok=True)
+            annotated_path = "outputs/annotated/annotated_image.png"
+            cv2.imwrite(annotated_path, annotated)
+
             logger = DetectionLogger("outputs/single_image_log.csv")
             logger.log(frame_id=0, detections=detections)
             logger.close()
@@ -1302,6 +1308,9 @@ with content_col:
                                         model_path=MODEL_PATH,
                                         conf_thresh=conf_thresh,
                                         model_names=detector.model.names,
+                                        input_type="image",
+                                        annotated_image_path=annotated_path,
+                                        image_resolution=(img.shape[1], img.shape[0]),
                                         use_llm=True)
                     rg.load_csv()
                     rg.compute_stats()
