@@ -88,7 +88,9 @@ class ReportGenerator:
     def __init__(self, csv_path, session_label="", model_path="",
                  conf_thresh=0.25, iou_thresh=0.5, tracker_name="ByteTrack",
                  model_names=None, video_info=None, use_llm=True,
-                 llm_model=None, frame_crops_dir=None):
+                 llm_model=None, frame_crops_dir=None,
+                 input_type='video', annotated_image_path=None,
+                 image_resolution=None):
         self.csv_path = Path(csv_path)
         self.session_label = session_label or self.csv_path.stem
         self.model_path = model_path or ""
@@ -98,6 +100,9 @@ class ReportGenerator:
         self.video_info = video_info or {}
         self.use_llm = use_llm
         self.frame_crops_dir = Path(frame_crops_dir) if frame_crops_dir else None
+        self.input_type = input_type
+        self.annotated_image_path = annotated_image_path
+        self.image_resolution = image_resolution
 
         # Resolve model_names
         if model_names is not None:
@@ -170,6 +175,12 @@ class ReportGenerator:
         s["conf_threshold"] = self.conf_thresh
         s["iou_threshold"] = self.iou_thresh
         s["tracker_name"] = self.tracker_name
+        s["input_type"] = self.input_type
+        if self.image_resolution:
+            w_res, h_res = self.image_resolution
+            s["image_resolution"] = f"{w_res}x{h_res}"
+        else:
+            s["image_resolution"] = None
         vi = self.video_info
         if vi:
             s["video_fps"] = vi.get("fps", 0)
@@ -211,6 +222,12 @@ class ReportGenerator:
             s["avg_duration"] = 0
             s["max_duration"] = 0
             s["min_duration"] = 0
+            s["input_type"] = self.input_type
+            if self.image_resolution:
+                w_res, h_res = self.image_resolution
+                s["image_resolution"] = f"{w_res}x{h_res}"
+            else:
+                s["image_resolution"] = None
             self.stats = s
             return s
 
@@ -457,9 +474,23 @@ class ReportGenerator:
         monitor = s.get("monitor", 0)
         sc = s.get("small_craft", 0)
         civ = s.get("civilian", 0)
+        is_image = (self.input_type == 'image')
 
         # Executive summary
-        if total == 0:
+        if is_image:
+            if total == 0:
+                exec_sum = "No vessel detections were recorded from the still image."
+            elif total == 1:
+                exec_sum = (
+                    f"1 detection was recorded from a still image. "
+                    f"Average model confidence was {avg_c:.1%}."
+                )
+            else:
+                exec_sum = (
+                    f"{total} detections were recorded from a still image. "
+                    f"Average model confidence was {avg_c:.1%}."
+                )
+        elif total == 0:
             exec_sum = ("No vessel contacts were recorded during this session. "
                         "The system maintained operational readiness throughout.")
         else:
@@ -477,7 +508,19 @@ class ReportGenerator:
             exec_sum += "The system maintained operational readiness throughout."
 
         # Threat assessment
-        if hp == 0 and pr == 0:
+        if is_image:
+            if hp == 0 and pr == 0:
+                ta = ("No priority-level threat contacts detected. No military vessels were "
+                      "identified in this image. Note: military recall is not guaranteed and "
+                      "absence of detection does not confirm absence of military assets.")
+            else:
+                ta = (f"{hp} HIGH PRIORITY and {pr} PRIORITY vessel(s) identified. "
+                      f"Threat assessment requires verification with raw detection data. "
+                      f"Monitor: {monitor}, Small craft: {sc}, Civilian: {civ}. "
+                      f"Note: military recall is not guaranteed.")
+            if s.get("low_conf_classes"):
+                ta += f" Low-confidence classes ({', '.join(s['low_conf_classes'])}) require manual review."
+        elif hp == 0 and pr == 0:
             ta = ("No priority-level threat contacts detected. No military vessels were "
                   "identified in this session. Note: military recall is not guaranteed and "
                   "absence of detection does not confirm absence of military assets.")
@@ -486,74 +529,131 @@ class ReportGenerator:
                   f"Threat assessment requires verification with raw detection data. "
                   f"Monitor: {monitor}, Small craft: {sc}, Civilian: {civ}. "
                   f"Note: military recall is not guaranteed.")
-        if s.get("low_conf_classes"):
+        if (not is_image) and s.get("low_conf_classes"):
             ta += f" Low-confidence classes ({', '.join(s['low_conf_classes'])}) require manual review."
 
         # Limitations
         limitations = []
-        if s.get("low_conf_classes"):
+        if is_image:
             limitations.append(
-                f"Low-confidence detections for classes: {', '.join(s['low_conf_classes'])}. "
-                "Manual verification recommended."
+                "Still image: vessel identity and tracking cannot be verified."
             )
-        if s.get("short_tracking"):
             limitations.append(
-                f"Short average tracking duration ({s.get('avg_duration', 0):.1f}s). "
-                "Vessel tracks may be fragmented."
+                "Cross-reference with AIS data recommended."
             )
-        source = (self.session_label or "").lower()
-        if any(w in source for w in ["cinema", "studio", "synthetic", "demo", "sample"]):
-            limitations.append("Source footage may not be real maritime surveillance footage.")
-        if total > 0 and total < 50:
-            limitations.append("Small sample size - statistics may not be representative.")
-        if s.get("missing_military_classes"):
-            limitations.append(
-                f"Missing military classes in model: {', '.join(s['missing_military_classes'])}. "
-                "Military detection capability may be limited."
-            )
-        if s.get("unmapped_classes"):
-            limitations.append(
-                f"Unmapped classes (no threat level defined): {', '.join(s['unmapped_classes'])}."
-            )
+            if s.get("low_conf_classes"):
+                limitations.append(
+                    f"Low-confidence detections for classes: {', '.join(s['low_conf_classes'])}. "
+                    "Manual verification recommended."
+                )
+            source = (self.session_label or "").lower()
+            if any(w in source for w in ["cinema", "studio", "synthetic", "demo", "sample"]):
+                limitations.append("Source image may not be real maritime surveillance imagery.")
+            if total > 0 and total < 50:
+                limitations.append("Small sample size - statistics may not be representative.")
+            if s.get("missing_military_classes"):
+                limitations.append(
+                    f"Missing military classes in model: {', '.join(s['missing_military_classes'])}. "
+                    "Military detection capability may be limited."
+                )
+            if s.get("unmapped_classes"):
+                limitations.append(
+                    f"Unmapped classes (no threat level defined): {', '.join(s['unmapped_classes'])}."
+                )
+        else:
+            if s.get("low_conf_classes"):
+                limitations.append(
+                    f"Low-confidence detections for classes: {', '.join(s['low_conf_classes'])}. "
+                    "Manual verification recommended."
+                )
+            if s.get("short_tracking"):
+                limitations.append(
+                    f"Short average tracking duration ({s.get('avg_duration', 0):.1f}s). "
+                    "Vessel tracks may be fragmented."
+                )
+            source = (self.session_label or "").lower()
+            if any(w in source for w in ["cinema", "studio", "synthetic", "demo", "sample"]):
+                limitations.append("Source footage may not be real maritime surveillance footage.")
+            if total > 0 and total < 50:
+                limitations.append("Small sample size - statistics may not be representative.")
+            if s.get("missing_military_classes"):
+                limitations.append(
+                    f"Missing military classes in model: {', '.join(s['missing_military_classes'])}. "
+                    "Military detection capability may be limited."
+                )
+            if s.get("unmapped_classes"):
+                limitations.append(
+                    f"Unmapped classes (no threat level defined): {', '.join(s['unmapped_classes'])}."
+                )
         if not limitations:
             limitations.append("No significant data quality limitations identified.")
 
         # Recommendations
         recommendations = []
-        if hp > 0:
-            recommendations.append("Investigate and track all HIGH PRIORITY contacts immediately.")
-        if pr > 0:
-            recommendations.append("Monitor PRIORITY contacts and report to command.")
-        if s.get("low_conf_classes"):
-            recommendations.append("Conduct manual review of all low-confidence detections.")
-        if s.get("short_tracking"):
-            recommendations.append("Review tracker configuration to improve track continuity.")
-        if s.get("missing_military_classes"):
-            recommendations.append("Update model with military class weights to improve recall.")
-        recommendations.append("Cross-reference detections with AIS data where available.")
-        recommendations.append("Archive detection log for post-mission audit trail.")
+        if is_image:
+            recommendations.append("Cross-reference detections with AIS data where available.")
+            recommendations.append("Test on additional images for statistical reliability.")
+            if hp > 0:
+                recommendations.append("Investigate and track all HIGH PRIORITY contacts immediately.")
+            if pr > 0:
+                recommendations.append("Monitor PRIORITY contacts and report to command.")
+            if s.get("low_conf_classes"):
+                recommendations.append("Conduct manual review of all low-confidence detections.")
+            if s.get("missing_military_classes"):
+                recommendations.append("Update model with military class weights to improve recall.")
+        else:
+            if hp > 0:
+                recommendations.append("Investigate and track all HIGH PRIORITY contacts immediately.")
+            if pr > 0:
+                recommendations.append("Monitor PRIORITY contacts and report to command.")
+            if s.get("low_conf_classes"):
+                recommendations.append("Conduct manual review of all low-confidence detections.")
+            if s.get("short_tracking"):
+                recommendations.append("Review tracker configuration to improve track continuity.")
+            if s.get("missing_military_classes"):
+                recommendations.append("Update model with military class weights to improve recall.")
+            recommendations.append("Cross-reference detections with AIS data where available.")
+            recommendations.append("Archive detection log for post-mission audit trail.")
         if not recommendations:
             recommendations.append("Continue standard monitoring procedures.")
 
         # Captions
-        captions = {
-            "track_chart": (
-                f"Per-vessel track chart showing {unique} vessel(s) across {frames} frame(s). "
-                "Each bar represents one vessel's detection span."
-            ),
-            "confidence_hist": (
-                f"Confidence distribution across {total} detections. "
-                f"Median: {s.get('median_confidence', 0):.1%}, threshold: {s.get('conf_threshold', 0.25):.0%}."
-            ),
-            "class_table": (
-                f"Per-class breakdown for {len(s.get('per_class', []))} detected class(es). "
-                "Low-confidence classes are flagged for review."
-            ),
-            "annotated_frames": (
-                "Annotated vessel crop images with detection overlay. "
-                "Confidence scores shown per crop."
-            ),
-        }
+        if is_image:
+            captions = {
+                "track_chart": "N/A for still image input",
+                "confidence_hist": (
+                    f"Confidence distribution across {total} detection(s). "
+                    f"Median: {s.get('median_confidence', 0):.1%}, "
+                    f"threshold: {s.get('conf_threshold', 0.25):.0%}."
+                ) if total > 0 else "No detections to display.",
+                "class_table": (
+                    f"Per-class breakdown for {len(s.get('per_class', []))} detected class(es). "
+                    "Low-confidence classes are flagged for review."
+                ),
+                "annotated_frames": (
+                    f"Annotated image with detection overlays for {total} detection(s). "
+                    "Confidence scores shown per detection."
+                ),
+            }
+        else:
+            captions = {
+                "track_chart": (
+                    f"Per-vessel track chart showing {unique} vessel(s) across {frames} frame(s). "
+                    "Each bar represents one vessel's detection span."
+                ),
+                "confidence_hist": (
+                    f"Confidence distribution across {total} detections. "
+                    f"Median: {s.get('median_confidence', 0):.1%}, threshold: {s.get('conf_threshold', 0.25):.0%}."
+                ),
+                "class_table": (
+                    f"Per-class breakdown for {len(s.get('per_class', []))} detected class(es). "
+                    "Low-confidence classes are flagged for review."
+                ),
+                "annotated_frames": (
+                    "Annotated vessel crop images with detection overlay. "
+                    "Confidence scores shown per crop."
+                ),
+            }
 
         return {
             "executive_summary": self._sanitize(exec_sum),
@@ -573,6 +673,7 @@ class ReportGenerator:
         df = self.df
         chart_dir = self._chart_dir
         chart_dir.mkdir(parents=True, exist_ok=True)
+        is_image = (self.input_type == 'image')
 
         # Class color map for Gantt
         class_colors = {}
@@ -584,58 +685,81 @@ class ReportGenerator:
         for i, cls in enumerate(all_classes):
             class_colors[cls] = palette[i % len(palette)]
 
-        # -- Chart 1: Per-vessel track chart (Gantt-style) --
-        fig, ax = plt.subplots(figsize=(6, 3))
-        if (df is not None and not df.empty
-                and "vessel_id" in df.columns and "frame_id" in df.columns):
-            vessels = sorted(df["vessel_id"].unique())
-            for idx, vid in enumerate(vessels):
-                vdf = df[df["vessel_id"] == vid]
-                cls = str(vdf["class_name"].iloc[0]) if "class_name" in vdf.columns else "unknown"
-                ff = int(vdf["frame_id"].min())
-                lf = int(vdf["frame_id"].max())
-                span = max(lf - ff, 1)
-                color = class_colors.get(cls, ACCENT)
-                ax.barh(idx, span, left=ff, height=0.6, color=color,
-                        edgecolor="white", linewidth=0.3)
-                label = f"#{int(vid)} {cls.replace('_', ' ')}"
-                ax.text(lf + max(span * 0.05, 1), idx, label,
-                        va="center", ha="left", fontsize=5.5, color="#333333")
-            ax.set_yticks(range(len(vessels)))
-            ax.set_yticklabels([f"#{int(v)}" for v in vessels], fontsize=6)
-            ax.set_xlabel("Frame ID", fontsize=7)
+        # -- Chart 1: Per-vessel track chart (Gantt-style) -- skip for images
+        if is_image:
+            charts["track_chart"] = None
         else:
-            ax.text(0.5, 0.5, "No detections", ha="center", va="center",
-                    transform=ax.transAxes, fontsize=10, color="#999999")
-            ax.set_xticks([])
-            ax.set_yticks([])
-        ax.set_title("Per-Vessel Track Duration", fontweight="bold", fontsize=9, pad=4)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.invert_yaxis()
-        fig.tight_layout()
-        path = str(chart_dir / "track_chart.png")
-        fig.savefig(path, bbox_inches="tight", facecolor="white", dpi=150, pad_inches=0.02)
-        plt.close(fig)
-        charts["track_chart"] = path
+            fig, ax = plt.subplots(figsize=(6, 3))
+            if (df is not None and not df.empty
+                    and "vessel_id" in df.columns and "frame_id" in df.columns):
+                vessels = sorted(df["vessel_id"].unique())
+                for idx, vid in enumerate(vessels):
+                    vdf = df[df["vessel_id"] == vid]
+                    cls = str(vdf["class_name"].iloc[0]) if "class_name" in vdf.columns else "unknown"
+                    ff = int(vdf["frame_id"].min())
+                    lf = int(vdf["frame_id"].max())
+                    span = max(lf - ff, 1)
+                    color = class_colors.get(cls, ACCENT)
+                    ax.barh(idx, span, left=ff, height=0.6, color=color,
+                            edgecolor="white", linewidth=0.3)
+                    label = f"#{int(vid)} {cls.replace('_', ' ')}"
+                    ax.text(lf + max(span * 0.05, 1), idx, label,
+                            va="center", ha="left", fontsize=5.5, color="#333333")
+                ax.set_yticks(range(len(vessels)))
+                ax.set_yticklabels([f"#{int(v)}" for v in vessels], fontsize=6)
+                ax.set_xlabel("Frame ID", fontsize=7)
+            else:
+                ax.text(0.5, 0.5, "No detections", ha="center", va="center",
+                        transform=ax.transAxes, fontsize=10, color="#999999")
+                ax.set_xticks([])
+                ax.set_yticks([])
+            ax.set_title("Per-Vessel Track Duration", fontweight="bold", fontsize=9, pad=4)
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.invert_yaxis()
+            fig.tight_layout()
+            path = str(chart_dir / "track_chart.png")
+            fig.savefig(path, bbox_inches="tight", facecolor="white", dpi=150, pad_inches=0.02)
+            plt.close(fig)
+            charts["track_chart"] = path
 
-        # -- Chart 2: Confidence histogram --
+        # -- Chart 2: Confidence histogram -- for images with <5 detections, use per-detection bar chart
         fig2, ax2 = plt.subplots(figsize=(5, 2.5))
         if (df is not None and not df.empty
                 and "confidence" in df.columns and len(df) > 0):
-            ax2.hist(df["confidence"], bins=20, color=ACCENT, edgecolor="white", alpha=0.85)
-            median_val = float(df["confidence"].median())
-            conf_thr = self.conf_thresh
-            ax2.axvline(median_val, color=ORANGE, linestyle="--", linewidth=1.2,
-                        label=f"Median: {median_val:.1%}")
-            ax2.axvline(conf_thr, color=RED, linestyle=":", linewidth=1.2,
-                        label=f"Threshold: {conf_thr:.0%}")
-            ax2.legend(fontsize=6, frameon=False, labelcolor="#444444")
+            if is_image and len(df) < 5:
+                # Per-detection bar chart: one bar per detection
+                confs = list(df["confidence"])
+                labels = [f"#{i+1}" for i in range(len(confs))]
+                bar_colors = [RED if c < self.conf_thresh else ACCENT for c in confs]
+                bars2 = ax2.bar(range(len(confs)), confs, color=bar_colors,
+                                edgecolor="white", width=0.6)
+                ax2.set_xticks(range(len(confs)))
+                ax2.set_xticklabels(labels, fontsize=6)
+                ax2.set_ylim(0, 1.0)
+                ax2.set_xlabel("Detection #", fontsize=7)
+                ax2.set_ylabel("Confidence", fontsize=7)
+                for bar2, cv in zip(bars2, confs):
+                    ax2.text(bar2.get_x() + bar2.get_width() / 2,
+                             bar2.get_height() + 0.02,
+                             f"{cv:.1%}", ha="center", va="bottom",
+                             fontsize=6, color="#333333")
+            else:
+                ax2.hist(df["confidence"], bins=20, color=ACCENT, edgecolor="white", alpha=0.85)
+                median_val = float(df["confidence"].median())
+                conf_thr = self.conf_thresh
+                ax2.axvline(median_val, color=ORANGE, linestyle="--", linewidth=1.2,
+                            label=f"Median: {median_val:.1%}")
+                ax2.axvline(conf_thr, color=RED, linestyle=":", linewidth=1.2,
+                            label=f"Threshold: {conf_thr:.0%}")
+                ax2.legend(fontsize=6, frameon=False, labelcolor="#444444")
+                ax2.set_xlabel("Confidence", fontsize=7)
+                ax2.set_ylabel("Count", fontsize=7)
         else:
             ax2.text(0.5, 0.5, "No data", ha="center", va="center",
                      transform=ax2.transAxes, fontsize=10, color="#999999")
-        ax2.set_xlabel("Confidence", fontsize=7)
-        ax2.set_ylabel("Count", fontsize=7)
+            ax2.set_xlabel("Confidence", fontsize=7)
+            ax2.set_ylabel("Count", fontsize=7)
         ax2.set_title("Confidence Distribution", fontweight="bold", fontsize=9, pad=4)
         ax2.spines["top"].set_visible(False)
         ax2.spines["right"].set_visible(False)
@@ -756,18 +880,33 @@ class ReportGenerator:
         vid_fps = s.get("video_fps", 0)
         vid_res = f"{s.get('video_width', 0)}x{s.get('video_height', 0)}"
         conf_pct = int(s.get("conf_threshold", 0.25) * 100) if isinstance(s.get("conf_threshold"), (int, float)) else 25
-        meta_lines = [
-            f"Session ID: {s.get('session_id', 'N/A')}",
-            f"Generated: {s.get('timestamp', 'N/A')}",
-            f"Source: {self._sanitize(self.session_label)}",
-            f"Model weights: {s.get('model_weights_name', 'N/A')}",
-            f"Classes: {s.get('num_classes', 0)}",
-            f"LLM model: {s.get('llm_model', 'N/A')}",
-            f"Conf threshold: {conf_pct}%",
-            f"IoU threshold: {s.get('iou_threshold', 0.5)}",
-            f"Tracker: {s.get('tracker_name', 'ByteTrack')}",
-            f"Video: {vid_res} @ {vid_fps} fps, {s.get('video_total_frames', 0)} frames, {s.get('video_duration_s', 0)}s",
-        ]
+        is_image = (self.input_type == 'image')
+        if is_image:
+            img_res = s.get("image_resolution", "N/A")
+            meta_lines = [
+                f"Session ID: {s.get('session_id', 'N/A')}",
+                f"Generated: {s.get('timestamp', 'N/A')}",
+                f"Source: {self._sanitize(self.session_label)}",
+                f"Model weights: {s.get('model_weights_name', 'N/A')}",
+                f"Classes: {s.get('num_classes', 0)}",
+                f"LLM model: {s.get('llm_model', 'N/A')}",
+                f"Conf threshold: {conf_pct}%",
+                f"IoU threshold: {s.get('iou_threshold', 0.5)}",
+                f"Input: still image, {img_res} px",
+            ]
+        else:
+            meta_lines = [
+                f"Session ID: {s.get('session_id', 'N/A')}",
+                f"Generated: {s.get('timestamp', 'N/A')}",
+                f"Source: {self._sanitize(self.session_label)}",
+                f"Model weights: {s.get('model_weights_name', 'N/A')}",
+                f"Classes: {s.get('num_classes', 0)}",
+                f"LLM model: {s.get('llm_model', 'N/A')}",
+                f"Conf threshold: {conf_pct}%",
+                f"IoU threshold: {s.get('iou_threshold', 0.5)}",
+                f"Tracker: {s.get('tracker_name', 'ByteTrack')}",
+                f"Video: {vid_res} @ {vid_fps} fps, {s.get('video_total_frames', 0)} frames, {s.get('video_duration_s', 0)}s",
+            ]
         for line in meta_lines:
             pdf.cell(0, 4.5, line)
             pdf.ln(4.5)
@@ -817,8 +956,82 @@ class ReportGenerator:
             pdf.set_text_color(50, 55, 65)
             pdf.cell(174, 4, m)
 
-        # -- Vessel Table --
-        self._section_header(pdf, "VESSEL TABLE")
+        # -- Vessel Table / Detection Table --
+        if is_image:
+            self._section_header(pdf, "DETECTION TABLE")
+
+            per_vessel = s.get("per_vessel", [])
+            if self.df is not None and not self.df.empty:
+                det_rows = []
+                for i, row in self.df.iterrows():
+                    cls_name = str(row.get("class_name", "unknown"))
+                    tl = str(row.get("threat_level", THREAT_LEVEL.get(cls_name, "UNKNOWN")))
+                    conf = float(row.get("confidence", 0.0))
+                    x1 = float(row.get("x1", 0)); y1 = float(row.get("y1", 0))
+                    x2 = float(row.get("x2", 0)); y2 = float(row.get("y2", 0))
+                    bbox_str = f"{int(x2-x1)}x{int(y2-y1)}"
+                    low_conf = (conf < 0.50)
+                    det_rows.append({
+                        "index": i + 1,
+                        "class_name": cls_name,
+                        "confidence": conf,
+                        "bbox": bbox_str,
+                        "threat_level": tl,
+                        "low_conf": low_conf,
+                    })
+
+                # Table header
+                hdr_y = pdf.get_y()
+                pdf.set_fill_color(230, 238, 242)
+                col_w = [12, 40, 24, 28, 36, 24]
+                total_w = sum(col_w)
+                pdf.rect(15, hdr_y, total_w, 8, "F")
+                pdf.set_xy(16, hdr_y + 1.5)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_text_color(26, 107, 138)
+                headers = ["#", "Class", "Conf", "Bbox (WxH)", "Threat Level", "Review"]
+                for hw, htext in zip(col_w, headers):
+                    pdf.cell(hw, 5, htext, align="C")
+                pdf.ln(8)
+
+                # Table rows
+                pdf.set_font("Helvetica", "", 8)
+                row_h = 8
+                for r in det_rows:
+                    row_bg = (245, 248, 250) if r["index"] % 2 == 1 else (250, 252, 254)
+                    y = pdf.get_y()
+                    pdf.set_fill_color(*row_bg)
+                    pdf.rect(15, y, total_w, row_h, "F")
+                    pdf.set_xy(16, y + 2)
+                    pdf.set_text_color(50, 55, 65)
+                    review_val = r["low_conf"]
+                    review_text = "LOW CONF" if review_val else "OK"
+                    review_color = _hex_to_rgb(RED) if review_val else _hex_to_rgb(GREEN)
+                    vals = [
+                        (str(r["index"]), "C"),
+                        (r["class_name"].replace("_", " ").title(), "L"),
+                        (f"{r['confidence']:.1%}", "C"),
+                        (r["bbox"], "C"),
+                        (r["threat_level"], "C"),
+                    ]
+                    for j, (val, align) in enumerate(vals):
+                        cw = col_w[j]
+                        pdf.cell(cw, 4, val, align=align)
+                    pdf.set_text_color(*review_color)
+                    pdf.set_font("Helvetica", "B", 7)
+                    pdf.cell(col_w[-1], 4, review_text, align="C")
+                    pdf.set_font("Helvetica", "", 8)
+                    pdf.set_text_color(50, 55, 65)
+                    pdf.ln(row_h)
+                pdf.ln(2)
+            else:
+                per_vessel = []
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(120, 120, 120)
+                pdf.cell(0, 8, "No detections in this image.")
+                pdf.ln(8)
+        else:
+            self._section_header(pdf, "VESSEL TABLE")
 
         per_vessel = s.get("per_vessel", [])
         if per_vessel:
@@ -913,66 +1126,90 @@ class ReportGenerator:
             pdf.cell(0, 8, "No vessels detected in this session.")
             pdf.ln(8)
 
-        # -- Annotated Frames (if crops available) --
-        crops_dir = self.frame_crops_dir
-        if crops_dir and crops_dir.exists():
-            crop_files = sorted(crops_dir.glob("vessel_*.jpg"))
-            if crop_files:
-                pdf.add_page()
-                self._section_header(pdf, "ANNOTATED FRAMES")
-                caps = llm.get("captions", {})
-                if caps.get("annotated_frames"):
-                    pdf.set_font("Helvetica", "", 9)
-                    pdf.set_text_color(80, 90, 100)
-                    pdf.multi_cell(180, 5, caps["annotated_frames"])
-                    pdf.ln(3)
-
-                shown = crop_files[:6]
-                img_w = 80
-                row_y = pdf.get_y()
-                for idx, cf in enumerate(shown):
-                    col = idx % 2
-                    if col == 0 and idx > 0:
-                        row_y = pdf.get_y() + 4
-                    x = 15 + col * 90
-                    m = re.search(r"vessel_(\d+)", cf.name)
-                    vid = int(m.group(1)) if m else 0
-                    vinfo = None
-                    for v in per_vessel:
-                        if v["vessel_id"] == vid:
-                            vinfo = v
-                            break
-                    label = f"#{vid}"
-                    if vinfo:
-                        label = (f"#{vid} {vinfo['class_name'].replace('_', ' ')} "
-                                 f"{vinfo['avg_conf']:.0%}")
-                    try:
-                        h = self._place_image(pdf, str(cf), x=x, y=row_y, w=img_w)
-                        pdf.set_xy(x, row_y + h + 0.5)
-                        pdf.set_font("Helvetica", "", 8)
+        # -- Annotated Frames (if crops available) -- (video mode only)
+        if not is_image:
+            crops_dir = self.frame_crops_dir
+            if crops_dir and crops_dir.exists():
+                crop_files = sorted(crops_dir.glob("vessel_*.jpg"))
+                if crop_files:
+                    pdf.add_page()
+                    self._section_header(pdf, "ANNOTATED FRAMES")
+                    caps = llm.get("captions", {})
+                    if caps.get("annotated_frames"):
+                        pdf.set_font("Helvetica", "", 9)
                         pdf.set_text_color(80, 90, 100)
-                        pdf.cell(img_w, 4, label, align="C")
-                        if col == 1:
-                            row_y = row_y + h + 8
-                    except Exception:
-                        pass
+                        pdf.multi_cell(180, 5, caps["annotated_frames"])
+                        pdf.ln(3)
+
+                    shown = crop_files[:6]
+                    img_w = 80
+                    row_y = pdf.get_y()
+                    for idx, cf in enumerate(shown):
+                        col = idx % 2
+                        if col == 0 and idx > 0:
+                            row_y = pdf.get_y() + 4
+                        x = 15 + col * 90
+                        m = re.search(r"vessel_(\d+)", cf.name)
+                        vid = int(m.group(1)) if m else 0
+                        vinfo = None
+                        for v in per_vessel:
+                            if v["vessel_id"] == vid:
+                                vinfo = v
+                                break
+                        label = f"#{vid}"
+                        if vinfo:
+                            label = (f"#{vid} {vinfo['class_name'].replace('_', ' ')} "
+                                     f"{vinfo['avg_conf']:.0%}")
+                        try:
+                            h = self._place_image(pdf, str(cf), x=x, y=row_y, w=img_w)
+                            pdf.set_xy(x, row_y + h + 0.5)
+                            pdf.set_font("Helvetica", "", 8)
+                            pdf.set_text_color(80, 90, 100)
+                            pdf.cell(img_w, 4, label, align="C")
+                            if col == 1:
+                                row_y = row_y + h + 8
+                        except Exception:
+                            pass
+
+        # -- Annotated Image section (image mode only) --
+        if is_image and self.annotated_image_path:
+            ann_path = str(self.annotated_image_path)
+            if Path(ann_path).exists():
+                self._section_header(pdf, "ANNOTATED IMAGE")
+                img_w = 180
+                try:
+                    h = self._place_image(pdf, ann_path, x=15, y=pdf.get_y(), w=img_w)
+                    pdf.set_y(pdf.get_y() + 4)
+                except Exception:
+                    pass
+                total_det = s.get("total_detections", 0)
+                label_label = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
+                caption = (f"Annotated image with #ID class conf% labels for {total_det} detection(s). "
+                           f"({label_label})")
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(100, 110, 120)
+                pdf.multi_cell(180, 4.5, caption)
+                pdf.ln(2)
 
         # ============================================================
         # Track Chart + Confidence Histogram (flows after vessel table)
         # ============================================================
 
-        # -- Per-Vessel Track Chart --
-        self._section_header(pdf, "PER-VESSEL TRACK CHART")
-        track_path = self.chart_paths.get("track_chart")
-        if track_path and Path(track_path).exists():
-            h = self._place_image(pdf, track_path, x=15, y=pdf.get_y(), w=180)
-            pdf.set_y(pdf.get_y() + 4)
+        # -- Per-Vessel Track Chart -- skip for images
         caps = llm.get("captions", {})
-        if caps.get("track_chart"):
-            pdf.set_font("Helvetica", "", 8)
-            pdf.set_text_color(100, 110, 120)
-            pdf.multi_cell(180, 4.5, caps["track_chart"])
-            pdf.ln(2)
+        if is_image:
+            pass  # No track chart for still images
+        else:
+            self._section_header(pdf, "PER-VESSEL TRACK CHART")
+            track_path = self.chart_paths.get("track_chart")
+            if track_path and Path(track_path).exists():
+                h = self._place_image(pdf, track_path, x=15, y=pdf.get_y(), w=180)
+                pdf.set_y(pdf.get_y() + 4)
+            if caps.get("track_chart"):
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(100, 110, 120)
+                pdf.multi_cell(180, 4.5, caps["track_chart"])
+                pdf.ln(2)
 
         # -- Confidence Histogram --
         self._section_header(pdf, "CONFIDENCE HISTOGRAM")
@@ -1047,29 +1284,59 @@ class ReportGenerator:
                 pdf.ln(row_h)
                 row_idx += 1
 
-            # Undetected classes (0 counts)
-            for cls_name in sorted(undetected):
-                row_bg = (245, 248, 250) if row_idx % 2 == 0 else (250, 252, 254)
-                y = pdf.get_y()
-                pdf.set_fill_color(*row_bg)
-                pdf.rect(15, y, total_w, row_h, "F")
-                pdf.set_xy(16, y + 2)
-                pdf.set_text_color(180, 180, 180)
-                vals = [
-                    (cls_name.replace("_", " ").title(), "L"),
-                    ("0", "C"), ("0", "C"),
-                    ("N/A", "C"), ("N/A", "C"), ("N/A", "C"),
-                ]
-                for j, (val, align) in enumerate(vals):
-                    cw = col_w[j]
-                    pdf.cell(cw, 4, val, align=align)
-                pdf.set_text_color(200, 200, 200)
+            # Undetected classes (0 counts) -- video mode shows full table; image mode lists in one line
+            if is_image:
+                if undetected:
+                    pdf.ln(2)
+                    pdf.set_font("Helvetica", "I", 8)
+                    pdf.set_text_color(150, 150, 150)
+                    undetected_display = [c.replace("_", " ").title() for c in sorted(undetected)]
+                    pdf.multi_cell(180, 4.5,
+                        f"Not detected: {', '.join(undetected_display)}")
+                    pdf.set_text_color(50, 55, 65)
+            else:
+                for cls_name in sorted(undetected):
+                    row_bg = (245, 248, 250) if row_idx % 2 == 0 else (250, 252, 254)
+                    y = pdf.get_y()
+                    pdf.set_fill_color(*row_bg)
+                    pdf.rect(15, y, total_w, row_h, "F")
+                    pdf.set_xy(16, y + 2)
+                    pdf.set_text_color(180, 180, 180)
+                    vals = [
+                        (cls_name.replace("_", " ").title(), "L"),
+                        ("0", "C"), ("0", "C"),
+                        ("N/A", "C"), ("N/A", "C"), ("N/A", "C"),
+                    ]
+                    for j, (val, align) in enumerate(vals):
+                        cw = col_w[j]
+                        pdf.cell(cw, 4, val, align=align)
+                    pdf.set_text_color(200, 200, 200)
+                    pdf.set_font("Helvetica", "", 7)
+                    pdf.cell(col_w[-1], 4, "N/A", align="C")
+                    pdf.set_font("Helvetica", "", 8)
+                    pdf.set_text_color(50, 55, 65)
+                    pdf.ln(row_h)
+                    row_idx += 1
+
+            # Threat Level Legend sub-heading (image mode)
+            if is_image:
+                pdf.ln(2)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_text_color(26, 107, 138)
+                pdf.cell(0, 5, "Threat Level Legend")
+                pdf.ln(5)
                 pdf.set_font("Helvetica", "", 7)
-                pdf.cell(col_w[-1], 4, "N/A", align="C")
-                pdf.set_font("Helvetica", "", 8)
-                pdf.set_text_color(50, 55, 65)
-                pdf.ln(row_h)
-                row_idx += 1
+                pdf.set_text_color(80, 90, 100)
+                tl_legend_parts = []
+                tl_groups = {}
+                for cls_name2, tl2 in THREAT_LEVEL.items():
+                    tl_groups.setdefault(tl2, []).append(cls_name2)
+                for tl_name2 in ["HIGH PRIORITY", "PRIORITY", "MONITOR", "SMALL CRAFT", "CIVILIAN"]:
+                    if tl_name2 in tl_groups:
+                        tl_legend_parts.append(f"{tl_name2}: {', '.join(tl_groups[tl_name2])}")
+                tl_legend_text = " | ".join(tl_legend_parts)
+                pdf.multi_cell(180, 4, tl_legend_text)
+                pdf.ln(2)
 
             if s.get("unmapped_classes"):
                 pdf.ln(2)
@@ -1125,6 +1392,12 @@ class ReportGenerator:
         # -- Limitations & Data Quality --
         self._section_header(pdf, "LIMITATIONS & DATA QUALITY")
         limitations = llm.get("limitations", [])
+        # Add roboflow source caveat if applicable
+        source_label = (self.session_label or "").lower()
+        if "roboflow" in source_label:
+            limitations = list(limitations) + [
+                "Source may be from the training/validation set; confidence may be optimistic."
+            ]
         if limitations:
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(50, 55, 65)
@@ -1138,6 +1411,12 @@ class ReportGenerator:
             pdf.set_text_color(120, 120, 120)
             pdf.cell(0, 6, "No significant limitations identified.")
             pdf.ln(6)
+        # Label: AI-generated or Template
+        lim_label = "AI-generated (llama3.1:8b)" if self.use_llm else "Template (LLM unavailable)"
+        pdf.set_font("Helvetica", "I", 7)
+        pdf.set_text_color(160, 160, 170)
+        pdf.cell(0, 4, lim_label, align="L")
+        pdf.ln(4)
 
         # -- Recommended Actions --
         pdf.ln(6)
@@ -1156,6 +1435,11 @@ class ReportGenerator:
             pdf.set_text_color(120, 120, 120)
             pdf.cell(0, 6, "No specific recommendations at this time.")
             pdf.ln(6)
+        rec_label = "AI-generated (llama3.1:8b)" if self.use_llm else "Template (LLM unavailable)"
+        pdf.set_font("Helvetica", "I", 7)
+        pdf.set_text_color(160, 160, 170)
+        pdf.cell(0, 4, rec_label, align="L")
+        pdf.ln(4)
 
         self._footer(pdf)
 
