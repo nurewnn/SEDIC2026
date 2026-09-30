@@ -1176,7 +1176,12 @@ with content_col:
             st.markdown('<div class="section-h">📊 MISSION REPORT (PDF)</div>', unsafe_allow_html=True)
             with st.spinner("Generating PDF with charts and analytics…"):
                 try:
-                    rg = ReportGenerator("outputs/single_image_log.csv", session_label=uploaded.name)
+                    rg = ReportGenerator("outputs/single_image_log.csv",
+                                        session_label=uploaded.name,
+                                        model_path=MODEL_PATH,
+                                        conf_thresh=conf_thresh,
+                                        model_names=detector.model.names,
+                                        use_llm=True)
                     rg.load_csv()
                     rg.compute_stats()
                     rg.generate_charts()
@@ -1397,7 +1402,15 @@ with content_col:
                 st.markdown('<div class="section-h">📊 MISSION REPORT (PDF)</div>', unsafe_allow_html=True)
                 with st.spinner("Generating PDF with charts and analytics…"):
                     try:
-                        rg = ReportGenerator(log_path, session_label=source_label)
+                        rg = ReportGenerator(log_path,
+                                            session_label=source_label,
+                                            model_path=MODEL_PATH,
+                                            conf_thresh=conf_thresh,
+                                            model_names=detector.model.names,
+                                            video_info={"fps": fps, "width": width,
+                                                       "height": height, "total_frames": total,
+                                                       "duration_s": duration},
+                                            use_llm=True)
                         rg.load_csv()
                         rg.compute_stats()
                         rg.generate_charts()
