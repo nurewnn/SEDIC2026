@@ -689,7 +689,7 @@ class ReportGenerator:
         pdf.set_line_width(0.3)
         y_line = pdf.get_y()
         pdf.line(15, y_line, 195, y_line)
-        pdf.ln(4)
+        pdf.ln(6)
 
     def _footer(self, pdf):
         """Draw footer at bottom of current page."""
@@ -778,7 +778,7 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(50, 55, 65)
         pdf.multi_cell(180, 5.5, llm.get("executive_summary", ""))
-        pdf.ln(4)
+        pdf.ln(6)
 
         # -- Key Metrics --
         self._section_header(pdf, "KEY METRICS")
@@ -1109,7 +1109,7 @@ class ReportGenerator:
             pdf.ln(8)
 
         # -- Threat Assessment --
-        pdf.ln(4)
+        pdf.ln(6)
         self._section_header(pdf, "THREAT ASSESSMENT")
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(50, 55, 65)
@@ -1155,7 +1155,7 @@ class ReportGenerator:
             pdf.ln(6)
 
         # -- Recommended Actions --
-        pdf.ln(4)
+        pdf.ln(6)
         self._section_header(pdf, "RECOMMENDED ACTIONS")
         recommendations = llm.get("recommendations", [])
         if recommendations:

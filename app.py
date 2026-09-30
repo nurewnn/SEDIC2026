@@ -1271,21 +1271,21 @@ with content_col:
 
             report_bytes = _build_incident_report(detections, uploaded.name)
 
-            # ── Standard Downloads (dropdown) ───────────────────────────────
-            st.markdown(
-                '<div class="download-dropdown-wrap">'
-                '<div class="download-dropdown-label">Download Centre</div>'
-                '<div class="download-dropdown-row">',
-                unsafe_allow_html=True
-            )
+            # ── Standard Downloads (two buttons, same style) ────────────────
             col_dl1, col_dl2 = st.columns(2)
             with col_dl1:
-                with st.container(key="download_log_btn"):
-                    st.download_button("Detection Log (CSV)", log_data, "detection_log.csv", "text/csv", key="dl_log_img")
+                with st.container(key="detail_download"):
+                    st.download_button(
+                        "DOWNLOAD DETECTION LOG", log_data, "detection_log.csv", "text/csv",
+                        use_container_width=True, key="detail_download_img_btn2"
+                    )
             with col_dl2:
-                with st.container(key="download_incident_btn"):
-                    st.download_button("Incident Report (TXT)", report_bytes, f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt", "text/plain", key="dl_incident_img")
-            st.markdown('</div></div>', unsafe_allow_html=True)
+                with st.container(key="incident_report"):
+                    st.download_button(
+                        "DOWNLOAD INCIDENT REPORT", report_bytes,
+                        f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt", "text/plain",
+                        use_container_width=True, key="incident_btn_img"
+                    )
 
             # ── AI Mission Report Card ──────────────────────────────────────
             st.markdown(
@@ -1518,24 +1518,24 @@ with content_col:
                 },
             )
 
-            # ── Standard Downloads (dropdown) ───────────────────────────────
-            st.markdown(
-                '<div class="download-dropdown-wrap">'
-                '<div class="download-dropdown-label">Download Centre</div>'
-                '<div class="download-dropdown-row">',
-                unsafe_allow_html=True
-            )
+            # ── Standard Downloads (two buttons, same style) ────────────────
             col_dl1, col_dl2 = st.columns(2)
             with col_dl1:
-                with st.container(key="download_log_btn"):
+                with st.container(key="detail_download_vid"):
                     if log_data is not None:
-                        st.download_button("Detection Log (CSV)", log_data, "detection_log.csv", "text/csv", key="dl_log_vid")
+                        st.download_button(
+                            "DOWNLOAD DETECTION LOG", log_data, "detection_log.csv", "text/csv",
+                            use_container_width=True, key="detail_download_vid_btn2"
+                        )
                     else:
                         st.markdown('<div style="color:#7192a5;font-size:.58rem;text-align:center;padding:10px 0;">No log generated</div>', unsafe_allow_html=True)
             with col_dl2:
-                with st.container(key="download_incident_btn"):
-                    st.download_button("Incident Report (TXT)", report_bytes, f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt", "text/plain", key="dl_incident_vid")
-            st.markdown('</div></div>', unsafe_allow_html=True)
+                with st.container(key="incident_report_vid"):
+                    st.download_button(
+                        "DOWNLOAD INCIDENT REPORT", report_bytes,
+                        f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt", "text/plain",
+                        use_container_width=True, key="incident_btn_vid"
+                    )
 
             # ── AI Mission Report Card ──────────────────────────────────────
             if log_data is not None:
