@@ -380,39 +380,30 @@ class ReportGenerator:
         pdf.set_text_color(50, 55, 65)
         pdf.multi_cell(180, 6, summary)
         pdf.ln(5)
-        # Key Metrics (2-column grid, larger rows)
+        # Key Metrics (single-column list, readable)
         self._section_header(pdf, "KEY METRICS")
         avg_str = f"{s.get('avg_confidence', 0):.1%}" if isinstance(s.get("avg_confidence"), (int, float)) else "N/A"
         min_str = f"{s.get('min_confidence', 0):.1%}" if isinstance(s.get("min_confidence"), (int, float)) else "N/A"
         max_str = f"{s.get('max_confidence', 0):.1%}" if isinstance(s.get("max_confidence"), (int, float)) else "N/A"
-        metrics_left = [
-            ("Total Contacts", str(s.get("total_detections", 0))),
-            ("Unique Vessels", str(s.get("unique_vessels", 0))),
-            ("Frames Processed", str(s.get("frames_processed", 0))),
-            ("Avg Confidence", avg_str),
-            ("Min / Max Confidence", f"{min_str} / {max_str}"),
+        all_metrics = [
+            ("Total Contacts",          str(s.get("total_detections", 0))),
+            ("Unique Vessels Tracked",   str(s.get("unique_vessels", 0))),
+            ("Frames Processed",        str(s.get("frames_processed", 0))),
+            ("HIGH PRIORITY Contacts",  str(s.get("high_priority", 0))),
+            ("PRIORITY Contacts",       str(s.get("priority", 0))),
+            ("Civilian Vessels",         str(s.get("civilian", 0))),
+            ("Threat Contact Ratio",    f"{s.get('threat_ratio', 0)}%"),
+            ("Avg Confidence",          avg_str),
+            ("Min / Max Confidence",    f"{min_str} / {max_str}"),
         ]
-        metrics_right = [
-            ("HIGH PRIORITY", str(s.get("high_priority", 0))),
-            ("PRIORITY", str(s.get("priority", 0))),
-            ("Civilian", str(s.get("civilian", 0))),
-            ("Threat Contact Ratio", f"{s.get('threat_ratio', 0)}%"),
-        ]
-        start_y = pdf.get_y()
-        row_h = 9
-        for i, (label, value) in enumerate(metrics_left):
-            self._metric_row_big(pdf, 15, start_y + i * row_h, 87, label, value, alt=(i % 2 == 0))
-        for i, (label, value) in enumerate(metrics_right):
-            self._metric_row_big(pdf, 108, start_y + i * row_h, 87, label, value, alt=(i % 2 == 0))
-        max_rows = max(len(metrics_left), len(metrics_right))
-        pdf.set_y(start_y + max_rows * row_h + 5)
-        # Duration stats if available
         if s.get("duration_stats"):
             ds = s["duration_stats"]
-            pdf.set_font("Helvetica", "", 9)
-            pdf.set_text_color(100, 110, 120)
-            pdf.cell(0, 6, f"Tracking Duration - Avg: {ds['avg_duration']}s  |  "
-                          f"Max: {ds['max_duration']}s  |  Min: {ds['min_duration']}s")
+            all_metrics.append(("Avg Tracking Duration", f"{ds['avg_duration']}s"))
+            all_metrics.append(("Max Tracking Duration", f"{ds['max_duration']}s"))
+        start_y = pdf.get_y()
+        row_h = 10
+        for i, (label, value) in enumerate(all_metrics):
+            self._metric_row_big(pdf, 15, start_y + i * row_h, 180, label, value, alt=(i % 2 == 0))
 
         # ══════════════════════════════════════════════════════════════════════
         # PAGE 2: Charts (full-size, well-spaced)
@@ -426,20 +417,20 @@ class ReportGenerator:
         pdf.set_draw_color(26, 107, 138)
         pdf.set_line_width(0.3)
         pdf.line(15, 24, 195, 24)
-        pdf.ln(5)
+        pdf.ln(15)  # gap between header and charts
 
-        # Threat pie + class bar side-by-side (larger)
+        # Threat pie + class bar side-by-side (same size)
         pie_path = self.chart_paths.get("threat_pie")
         bar_path = self.chart_paths.get("class_bar")
         charts_y = pdf.get_y()
         placed_h = 0
         if pie_path and Path(pie_path).exists():
-            h = self._place_image(pdf, pie_path, x=15, y=charts_y, w=85)
+            h = self._place_image(pdf, pie_path, x=15, y=charts_y, w=88)
             placed_h = max(placed_h, h)
         if bar_path and Path(bar_path).exists():
-            h2 = self._place_image(pdf, bar_path, x=110, y=charts_y, w=85)
+            h2 = self._place_image(pdf, bar_path, x=108, y=charts_y, w=88)
             placed_h = max(placed_h, h2)
-        pdf.set_y(charts_y + placed_h + 10)
+        pdf.set_y(charts_y + placed_h + 12)
 
         # Confidence histogram (centered, larger)
         hist_path = self.chart_paths.get("conf_hist")
