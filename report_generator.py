@@ -800,7 +800,10 @@ class ReportGenerator:
     # -- PDF helpers ------------------------------------------------------------
 
     def _section_header(self, pdf, title, y=None):
-        """Draw section header with teal text and thin underline. ln(4) after."""
+        """Draw section header with teal text and thin underline. Big gap before and after."""
+        # Gap before the section (unless we're at the top of a page)
+        if pdf.get_y() > 25:
+            pdf.ln(8)
         if y is not None:
             pdf.set_xy(15, y)
         else:
@@ -813,7 +816,7 @@ class ReportGenerator:
         pdf.set_line_width(0.3)
         y_line = pdf.get_y()
         pdf.line(15, y_line, 195, y_line)
-        pdf.ln(6)
+        pdf.ln(8)
 
     def _footer(self, pdf):
         """Draw footer at bottom of current page."""
@@ -828,12 +831,17 @@ class ReportGenerator:
         pdf.cell(0, 4, footer_text, align="L")
         pdf.set_auto_page_break(auto=True, margin=18)
 
-    def _place_image(self, pdf, path, x, y, w):
-        """Place an image at (x, y) with width w. Returns height in mm."""
+    def _place_image(self, pdf, path, x, y, w, max_h=None):
+        """Place an image at (x, y) with width w. Returns height in mm.
+        If max_h is set, image is scaled to fit within both w and max_h (uniform sizing)."""
         from PIL import Image as PILImage
         img = PILImage.open(path)
         aspect = img.height / img.width
         h = w * aspect
+        # If max_h is set and the image is too tall, scale down to fit
+        if max_h is not None and h > max_h:
+            h = max_h
+            w = h / aspect if aspect > 0 else w
         pdf.image(path, x=x, y=y, w=w)
         pdf.set_xy(x, y + h)
         return h
@@ -1176,10 +1184,11 @@ class ReportGenerator:
             ann_path = str(self.annotated_image_path)
             if Path(ann_path).exists():
                 self._section_header(pdf, "ANNOTATED IMAGE")
-                img_w = 180
+                img_w = 170
+                img_max_h = 100  # uniform max height for all annotated images
                 try:
-                    h = self._place_image(pdf, ann_path, x=15, y=pdf.get_y(), w=img_w)
-                    pdf.set_y(pdf.get_y() + 4)
+                    h = self._place_image(pdf, ann_path, x=20, y=pdf.get_y(), w=img_w, max_h=img_max_h)
+                    pdf.set_y(pdf.get_y() + 6)
                 except Exception:
                     pass
                 total_det = s.get("total_detections", 0)
