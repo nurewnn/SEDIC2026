@@ -611,6 +611,114 @@ hr{border-color:rgba(53,215,243,.15) !important;}
     border-color:var(--orange) !important;background:rgba(40,20,3,.98) !important;
 }
 
+/* ═══ AI MISSION REPORT CARD ════════════════════════════════════════════ */
+.ai-report-card{
+    background:linear-gradient(145deg,rgba(4,18,30,.98),rgba(2,12,22,.99));
+    border:1px solid rgba(53,215,243,.35);
+    border-radius:14px;
+    padding:18px 20px 16px 20px;
+    margin:14px 0 8px 0;
+    box-shadow:0 0 0 1px rgba(53,215,243,.08) inset,
+               0 8px 28px rgba(0,0,0,.35),
+               0 0 32px rgba(53,215,243,.12);
+    position:relative;
+    overflow:hidden;
+}
+.ai-report-card::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,transparent,var(--accent),var(--accent-soft),var(--accent),transparent);
+}
+.ai-report-badge{
+    display:inline-flex;align-items:center;gap:7px;
+    background:linear-gradient(135deg,rgba(53,215,243,.18),rgba(53,215,243,.08));
+    border:1px solid rgba(53,215,243,.30);
+    border-radius:6px;
+    padding:4px 12px;
+    font-size:.56rem;font-weight:800;letter-spacing:1.5px;
+    color:var(--accent-soft);
+    text-transform:uppercase;
+    margin-bottom:12px;
+}
+.ai-report-badge .dot-ai{
+    width:7px;height:7px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+    animation:blink 1.4s infinite;
+}
+.ai-report-title{
+    color:#edf7ff;font-size:1.05rem;font-weight:800;letter-spacing:1px;
+    margin:0 0 4px 0;line-height:1.3;
+}
+.ai-report-subtitle{
+    color:#7192a5;font-size:.66rem;font-weight:600;letter-spacing:1px;
+    margin:0 0 14px 0;text-transform:uppercase;
+}
+.ai-report-features{
+    display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;
+    margin-bottom:14px;
+}
+.ai-report-feature{
+    display:flex;align-items:center;gap:8px;
+    font-size:.62rem;color:#b8d0dc;letter-spacing:.5px;
+    padding:5px 0;
+}
+.ai-report-feature .feat-icon{
+    width:18px;height:18px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(53,215,243,.12);border:1px solid rgba(53,215,243,.20);
+    border-radius:5px;font-size:.7rem;color:var(--accent);
+}
+.ai-report-feature b{color:var(--accent-soft);font-weight:800;}
+.st-key-ai_mission_report .stDownloadButton > button,
+.st-key-ai_mission_report_vid .stDownloadButton > button{
+    width:100%;min-height:52px;
+    background:linear-gradient(135deg,rgba(6,32,50,.98),rgba(3,16,28,.99)) !important;
+    border:1px solid var(--accent) !important;
+    color:var(--accent-soft) !important;
+    font-size:.72rem !important;font-weight:800 !important;letter-spacing:2px !important;
+    text-transform:uppercase;
+    box-shadow:0 0 16px rgba(53,215,243,.18) !important;
+}
+.st-key-ai_mission_report .stDownloadButton > button:hover,
+.st-key-ai_mission_report_vid .stDownloadButton > button:hover{
+    background:linear-gradient(135deg,rgba(10,45,65,.99),rgba(5,25,40,.99)) !important;
+    box-shadow:0 0 28px rgba(53,215,243,.30) !important;
+    transform:translateY(-1px);
+}
+.ai-report-generating{
+    color:var(--accent-soft);font-size:.66rem;letter-spacing:1px;
+    padding:8px 0;text-align:center;
+    animation:blink 1.2s infinite;
+}
+
+/* ═══ DOWNLOAD DROPDOWN ═════════════════════════════════════════════════ */
+.download-dropdown-wrap{
+    background:rgba(3,12,20,.70);
+    border:1px solid rgba(53,215,243,.15);
+    border-radius:10px;
+    padding:12px 14px 10px 14px;
+    margin:10px 0 6px 0;
+}
+.download-dropdown-label{
+    color:#7192a5;font-size:.56rem;font-weight:700;letter-spacing:1.8px;
+    text-transform:uppercase;margin-bottom:8px;
+}
+.download-dropdown-row{
+    display:grid;grid-template-columns:1fr 1fr;gap:8px;
+}
+.st-key-download_log_btn .stDownloadButton > button,
+.st-key-download_incident_btn .stDownloadButton > button{
+    width:100%;min-height:36px;
+    background:rgba(4,14,24,.90) !important;
+    border:1px solid rgba(113,174,198,.22) !important;
+    color:#91afbd !important;font-size:.58rem !important;font-weight:700 !important;
+    letter-spacing:1px !important;
+}
+.st-key-download_log_btn .stDownloadButton > button:hover,
+.st-key-download_incident_btn .stDownloadButton > button:hover{
+    border-color:var(--accent) !important;color:var(--accent-soft) !important;
+    background:rgba(6,28,42,.95) !important;
+}
+
 /* ═══ ALERT MUTE / ACKNOWLEDGE ══════════════════════════════════════════ */
 .mute-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(53,215,243,.07);font-size:.63rem;color:#b0cdd8;}
 .mute-row:last-child{border-bottom:none;}
@@ -1162,19 +1270,40 @@ with content_col:
             )
 
             report_bytes = _build_incident_report(detections, uploaded.name)
-            with st.container(key="incident_report"):
-                st.download_button(
-                    "📄 DOWNLOAD INCIDENT REPORT",
-                    report_bytes,
-                    f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt",
-                    "text/plain",
-                    use_container_width=False,
-                    key="incident_btn_img"
-                )
 
-            # ── Mission Report PDF (Intelligence Pipeline) ───────────────────
-            st.markdown('<div class="section-h">📊 MISSION REPORT (PDF)</div>', unsafe_allow_html=True)
-            with st.spinner("Generating PDF with charts and analytics…"):
+            # ── Standard Downloads (dropdown) ───────────────────────────────
+            st.markdown(
+                '<div class="download-dropdown-wrap">'
+                '<div class="download-dropdown-label">Download Centre</div>'
+                '<div class="download-dropdown-row">',
+                unsafe_allow_html=True
+            )
+            col_dl1, col_dl2 = st.columns(2)
+            with col_dl1:
+                with st.container(key="download_log_btn"):
+                    st.download_button("Detection Log (CSV)", log_data, "detection_log.csv", "text/csv", key="dl_log_img")
+            with col_dl2:
+                with st.container(key="download_incident_btn"):
+                    st.download_button("Incident Report (TXT)", report_bytes, f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt", "text/plain", key="dl_incident_img")
+            st.markdown('</div></div>', unsafe_allow_html=True)
+
+            # ── AI Mission Report Card ──────────────────────────────────────
+            st.markdown(
+                '<div class="ai-report-card">'
+                '<div class="ai-report-badge"><span class="dot-ai"></span>AI-POWERED INTELLIGENCE PIPELINE</div>'
+                '<div class="ai-report-title">Mission Report</div>'
+                '<div class="ai-report-subtitle">Local LLM Analysis - Pandas - Matplotlib - FPDF</div>'
+                '<div class="ai-report-features">'
+                '<div class="ai-report-feature"><span class="feat-icon">&#x1f4ca;</span>Statistical <b>Analytics</b></div>'
+                '<div class="ai-report-feature"><span class="feat-icon">&#x1f9ed;</span>Threat <b>Assessment</b></div>'
+                '<div class="ai-report-feature"><span class="feat-icon">&#x1f4c8;</span>Per-Vessel <b>Track Chart</b></div>'
+                '<div class="ai-report-feature"><span class="feat-icon">&#x26a0;</span>Low-Conf <b>Flags</b></div>'
+                '<div class="ai-report-feature"><span class="feat-icon">&#x1f9fe;</span>Session <b>Metadata</b></div>'
+                '<div class="ai-report-feature"><span class="feat-icon">&#x1f4dd;</span>Limitations & <b>Actions</b></div>'
+                '</div>',
+                unsafe_allow_html=True
+            )
+            with st.spinner("Generating AI mission report with charts and analytics..."):
                 try:
                     rg = ReportGenerator("outputs/single_image_log.csv",
                                         session_label=uploaded.name,
@@ -1186,17 +1315,19 @@ with content_col:
                     rg.compute_stats()
                     rg.generate_charts()
                     pdf_bytes = rg.build_pdf_bytes()
-                    st.download_button(
-                        "📥 DOWNLOAD MISSION REPORT (PDF)",
-                        pdf_bytes,
-                        f"mission_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf",
-                        "application/pdf",
-                        use_container_width=False,
-                        key="mission_pdf_btn_img"
-                    )
-                    st.success("✅ Mission report generated successfully.")
+                    with st.container(key="ai_mission_report"):
+                        st.download_button(
+                            "DOWNLOAD MISSION REPORT (PDF)",
+                            pdf_bytes,
+                            f"mission_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf",
+                            "application/pdf",
+                            use_container_width=True,
+                            key="mission_pdf_btn_img"
+                        )
+                    st.success("Mission report generated - AI analysis complete.")
                 except Exception as e:
                     st.warning(f"Report generation failed (non-critical): {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
 
            
 
@@ -1378,7 +1509,6 @@ with content_col:
                         use_container_width=False, key="detail_download_vid_btn"
                     )
 
-            # ── Incident report built from the peak frame + whole-video summary ──
             report_bytes = _build_incident_report(
                 peak_detections, source_label, peak_frame_id,
                 session_summary={
@@ -1387,20 +1517,44 @@ with content_col:
                     "threat_timeline": threat_timeline,
                 },
             )
-            with st.container(key="incident_report_vid"):
-                st.download_button(
-                    "📄 DOWNLOAD INCIDENT REPORT",
-                    report_bytes,
-                    f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt",
-                    "text/plain",
-                    use_container_width=False,
-                    key="incident_btn_vid"
-                )
 
-            # ── Mission Report PDF (Intelligence Pipeline) ───────────────────
+            # ── Standard Downloads (dropdown) ───────────────────────────────
+            st.markdown(
+                '<div class="download-dropdown-wrap">'
+                '<div class="download-dropdown-label">Download Centre</div>'
+                '<div class="download-dropdown-row">',
+                unsafe_allow_html=True
+            )
+            col_dl1, col_dl2 = st.columns(2)
+            with col_dl1:
+                with st.container(key="download_log_btn"):
+                    if log_data is not None:
+                        st.download_button("Detection Log (CSV)", log_data, "detection_log.csv", "text/csv", key="dl_log_vid")
+                    else:
+                        st.markdown('<div style="color:#7192a5;font-size:.58rem;text-align:center;padding:10px 0;">No log generated</div>', unsafe_allow_html=True)
+            with col_dl2:
+                with st.container(key="download_incident_btn"):
+                    st.download_button("Incident Report (TXT)", report_bytes, f"incident_{time.strftime('%Y%m%d_%H%M%S')}.txt", "text/plain", key="dl_incident_vid")
+            st.markdown('</div></div>', unsafe_allow_html=True)
+
+            # ── AI Mission Report Card ──────────────────────────────────────
             if log_data is not None:
-                st.markdown('<div class="section-h">📊 MISSION REPORT (PDF)</div>', unsafe_allow_html=True)
-                with st.spinner("Generating PDF with charts and analytics…"):
+                st.markdown(
+                    '<div class="ai-report-card">'
+                    '<div class="ai-report-badge"><span class="dot-ai"></span>AI-POWERED INTELLIGENCE PIPELINE</div>'
+                    '<div class="ai-report-title">Mission Report</div>'
+                    '<div class="ai-report-subtitle">Local LLM Analysis - Pandas - Matplotlib - FPDF</div>'
+                    '<div class="ai-report-features">'
+                    '<div class="ai-report-feature"><span class="feat-icon">&#x1f4ca;</span>Statistical <b>Analytics</b></div>'
+                    '<div class="ai-report-feature"><span class="feat-icon">&#x1f9ed;</span>Threat <b>Assessment</b></div>'
+                    '<div class="ai-report-feature"><span class="feat-icon">&#x1f4c8;</span>Per-Vessel <b>Track Chart</b></div>'
+                    '<div class="ai-report-feature"><span class="feat-icon">&#x26a0;</span>Low-Conf <b>Flags</b></div>'
+                    '<div class="ai-report-feature"><span class="feat-icon">&#x1f9fe;</span>Session <b>Metadata</b></div>'
+                    '<div class="ai-report-feature"><span class="feat-icon">&#x1f4dd;</span>Limitations & <b>Actions</b></div>'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+                with st.spinner("Generating AI mission report with charts and analytics..."):
                     try:
                         rg = ReportGenerator(log_path,
                                             session_label=source_label,
@@ -1415,16 +1569,18 @@ with content_col:
                         rg.compute_stats()
                         rg.generate_charts()
                         pdf_bytes = rg.build_pdf_bytes()
-                        st.download_button(
-                            "📥 DOWNLOAD MISSION REPORT (PDF)",
-                            pdf_bytes,
-                            f"mission_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf",
-                            "application/pdf",
-                            use_container_width=False,
-                            key="mission_pdf_btn_vid"
-                        )
-                        st.success("✅ Mission report generated successfully.")
+                        with st.container(key="ai_mission_report_vid"):
+                            st.download_button(
+                                "DOWNLOAD MISSION REPORT (PDF)",
+                                pdf_bytes,
+                                f"mission_report_{time.strftime('%Y%m%d_%H%M%S')}.pdf",
+                                "application/pdf",
+                                use_container_width=True,
+                                key="mission_pdf_btn_vid"
+                            )
+                        st.success("Mission report generated - AI analysis complete.")
                     except Exception as e:
                         st.warning(f"Report generation failed (non-critical): {e}")
+                st.markdown('</div>', unsafe_allow_html=True)
 
             st.success(f"✅ Processed {frame_id} frames — session complete.")
