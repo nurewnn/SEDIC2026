@@ -1066,14 +1066,6 @@ def render_detection_card(annotated_rgb, detections, source_name, conf_thresh, l
         with det_col:
             with st.container(key=detail_pane_key):
                 st.markdown(_build_detail_panel_html(detections), unsafe_allow_html=True)
-                if log_data is not None:
-                    st.markdown('<div class="detail-download-wrap"></div>', unsafe_allow_html=True)
-                    with st.container(key=download_key):
-                        st.download_button(
-                            "DOWNLOAD DETECTION LOG",
-                            log_data, "detection_log.csv", "text/csv",
-                            use_container_width=True, key=f"{download_key}_btn"
-                        )
 
 
 def render_aggregate_section(class_counts, class_levels, live_info, tracking_info,
@@ -1500,14 +1492,6 @@ with content_col:
                 ),
                 unsafe_allow_html=True
             )
-
-            if log_data is not None:
-                with st.container(key="detail_download"):
-                    st.download_button(
-                        "DOWNLOAD DETECTION LOG",
-                        log_data, "detection_log.csv", "text/csv",
-                        use_container_width=False, key="detail_download_vid_btn"
-                    )
 
             report_bytes = _build_incident_report(
                 peak_detections, source_label, peak_frame_id,

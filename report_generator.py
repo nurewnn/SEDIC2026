@@ -817,12 +817,7 @@ class ReportGenerator:
             pdf.set_text_color(50, 55, 65)
             pdf.cell(174, 4, m)
 
-        self._footer(pdf)
-
-        # ============================================================
-        # PAGE 2: Vessel Table + (optional) Annotated Frames
-        # ============================================================
-        pdf.add_page()
+        # -- Vessel Table --
         self._section_header(pdf, "VESSEL TABLE")
 
         per_vessel = s.get("per_vessel", [])
@@ -918,8 +913,6 @@ class ReportGenerator:
             pdf.cell(0, 8, "No vessels detected in this session.")
             pdf.ln(8)
 
-        self._footer(pdf)
-
         # -- Annotated Frames (if crops available) --
         crops_dir = self.frame_crops_dir
         if crops_dir and crops_dir.exists():
@@ -963,12 +956,10 @@ class ReportGenerator:
                             row_y = row_y + h + 8
                     except Exception:
                         pass
-                self._footer(pdf)
 
         # ============================================================
-        # PAGE 3: Track Chart + Confidence Histogram
+        # Track Chart + Confidence Histogram (flows after vessel table)
         # ============================================================
-        pdf.add_page()
 
         # -- Per-Vessel Track Chart --
         self._section_header(pdf, "PER-VESSEL TRACK CHART")
@@ -995,12 +986,9 @@ class ReportGenerator:
             pdf.multi_cell(180, 4.5, caps["confidence_hist"])
             pdf.ln(2)
 
-        self._footer(pdf)
-
         # ============================================================
-        # PAGE 4: Per-Class Table + Threat Assessment
+        # Per-Class Table + Threat Assessment (flows after histogram)
         # ============================================================
-        pdf.add_page()
 
         # -- Per-Class Table --
         self._section_header(pdf, "PER-CLASS TABLE")
@@ -1130,12 +1118,9 @@ class ReportGenerator:
         pdf.multi_cell(180, 4, legend_text)
         pdf.ln(2)
 
-        self._footer(pdf)
-
         # ============================================================
-        # PAGE 5: Limitations + Recommendations
+        # Limitations + Recommendations (flows after threat assessment)
         # ============================================================
-        pdf.add_page()
 
         # -- Limitations & Data Quality --
         self._section_header(pdf, "LIMITATIONS & DATA QUALITY")
