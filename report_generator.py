@@ -1171,8 +1171,8 @@ class ReportGenerator:
                         except Exception:
                             pass
 
-        # -- Annotated Image section (image mode only) --
-        if is_image and self.annotated_image_path:
+        # -- Annotated Image section (image or video mode) --
+        if self.annotated_image_path:
             ann_path = str(self.annotated_image_path)
             if Path(ann_path).exists():
                 self._section_header(pdf, "ANNOTATED IMAGE")
@@ -1184,8 +1184,12 @@ class ReportGenerator:
                     pass
                 total_det = s.get("total_detections", 0)
                 label_label = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
-                caption = (f"Annotated image with #ID class conf% labels for {total_det} detection(s). "
-                           f"({label_label})")
+                if is_image:
+                    caption = (f"Annotated image with #ID class conf% labels for {total_det} detection(s). "
+                               f"({label_label})")
+                else:
+                    caption = (f"Peak threat frame - annotated with #ID class conf% labels for {total_det} detection(s). "
+                               f"({label_label})")
                 pdf.set_font("Helvetica", "", 8)
                 pdf.set_text_color(100, 110, 120)
                 pdf.multi_cell(180, 4.5, caption)

@@ -1502,6 +1502,13 @@ with content_col:
                 unsafe_allow_html=True
             )
 
+            # Save peak annotated frame for the mission report
+            import os as _os
+            _os.makedirs("outputs/annotated", exist_ok=True)
+            annotated_vid_path = "outputs/annotated/peak_annotated.png"
+            if peak_rgb is not None:
+                cv2.imwrite(annotated_vid_path, cv2.cvtColor(peak_rgb, cv2.COLOR_RGB2BGR))
+
             report_bytes = _build_incident_report(
                 peak_detections, source_label, peak_frame_id,
                 session_summary={
@@ -1557,6 +1564,8 @@ with content_col:
                                             video_info={"fps": fps, "width": width,
                                                        "height": height, "total_frames": total,
                                                        "duration_s": duration},
+                                            input_type="video",
+                                            annotated_image_path=annotated_vid_path,
                                             use_llm=True)
                         rg.load_csv()
                         rg.compute_stats()
