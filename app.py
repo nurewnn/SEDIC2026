@@ -1388,6 +1388,15 @@ with content_col:
             # Reset tracker state for this video session
             detector.reset_tracker()
 
+            # Save annotated frames for the mission report (up to 3 key frames)
+            import os as _os
+            _os.makedirs("outputs/annotated", exist_ok=True)
+            annotated_frames_dir = "outputs/annotated"
+            first_annotated_rgb = None
+            last_annotated_rgb = None
+            first_annotated_frame_id = None
+            last_annotated_frame_id = None
+
             while cap.isOpened():
                 frame_start = time.perf_counter()
 
@@ -1432,6 +1441,14 @@ with content_col:
                     if score > peak_score:
                         peak_score, peak_detections = score, detections
                         peak_rgb, peak_frame_id = annotated_rgb, frame_id
+
+                    # Track first and last annotated frames for the report
+                    if first_annotated_rgb is None and detections:
+                        first_annotated_rgb = annotated_rgb
+                        first_annotated_frame_id = frame_id
+                    if detections:
+                        last_annotated_rgb = annotated_rgb
+                        last_annotated_frame_id = frame_id
 
                     _push_history(detections, frame_label=f"frame {frame_id}")
                     _update_threat_audio(detections, alert_sound_ph)
@@ -1505,9 +1522,20 @@ with content_col:
             # Save peak annotated frame for the mission report
             import os as _os
             _os.makedirs("outputs/annotated", exist_ok=True)
-            annotated_vid_path = "outputs/annotated/peak_annotated.png"
+            annotated_frames = []
+            if first_annotated_rgb is not None:
+                p1 = "outputs/annotated/frame_first.png"
+                cv2.imwrite(p1, cv2.cvtColor(first_annotated_rgb, cv2.COLOR_RGB2BGR))
+                annotated_frames.append((p1, f"First detection frame (#{first_annotated_frame_id})"))
             if peak_rgb is not None:
-                cv2.imwrite(annotated_vid_path, cv2.cvtColor(peak_rgb, cv2.COLOR_RGB2BGR))
+                p2 = "outputs/annotated/frame_peak.png"
+                cv2.imwrite(p2, cv2.cvtColor(peak_rgb, cv2.COLOR_RGB2BGR))
+                annotated_frames.append((p2, f"Peak threat frame (#{peak_frame_id})"))
+            if last_annotated_rgb is not None and last_annotated_frame_id != first_annotated_frame_id:
+                p3 = "outputs/annotated/frame_last.png"
+                cv2.imwrite(p3, cv2.cvtColor(last_annotated_rgb, cv2.COLOR_RGB2BGR))
+                annotated_frames.append((p3, f"Last detection frame (#{last_annotated_frame_id})"))
+            annotated_vid_path = annotated_frames[0][0] if annotated_frames else None
 
             report_bytes = _build_incident_report(
                 peak_detections, source_label, peak_frame_id,
@@ -1566,6 +1594,7 @@ with content_col:
                                                        "duration_s": duration},
                                             input_type="video",
                                             annotated_image_path=annotated_vid_path,
+                                            annotated_frames=annotated_frames,
                                             use_llm=True)
                         rg.load_csv()
                         rg.compute_stats()

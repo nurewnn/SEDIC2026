@@ -90,7 +90,7 @@ class ReportGenerator:
                  model_names=None, video_info=None, use_llm=True,
                  llm_model=None, frame_crops_dir=None,
                  input_type='video', annotated_image_path=None,
-                 image_resolution=None):
+                 image_resolution=None, annotated_frames=None):
         self.csv_path = Path(csv_path)
         self.session_label = session_label or self.csv_path.stem
         self.model_path = model_path or ""
@@ -103,6 +103,7 @@ class ReportGenerator:
         self.input_type = input_type
         self.annotated_image_path = annotated_image_path
         self.image_resolution = image_resolution
+        self.annotated_frames = annotated_frames or []  # list of (path, label) tuples
 
         # Resolve model_names
         if model_names is not None:
@@ -963,6 +964,7 @@ class ReportGenerator:
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(50, 55, 65)
             pdf.cell(174, 4, m)
+        pdf.ln(5)  # gap after key metrics before next section
 
         # -- Vessel Table / Detection Table --
         if is_image:
@@ -1180,29 +1182,41 @@ class ReportGenerator:
                             pass
 
         # -- Annotated Image section (image or video mode) --
-        if self.annotated_image_path:
-            ann_path = str(self.annotated_image_path)
-            if Path(ann_path).exists():
-                self._section_header(pdf, "ANNOTATED IMAGE")
-                img_w = 170
-                img_max_h = 100  # uniform max height for all annotated images
+        # For image mode: single annotated image
+        # For video mode: up to 3 key frames (first, peak, last)
+        all_annotated = []
+        if self.annotated_image_path and Path(str(self.annotated_image_path)).exists():
+            total_det = s.get("total_detections", 0)
+            label_label = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
+            if is_image:
+                cap = (f"Annotated image with #ID class conf% labels for {total_det} detection(s). "
+                       f"({label_label})")
+            else:
+                cap = (f"Peak threat frame - annotated with #ID class conf% labels for {total_det} detection(s). "
+                       f"({label_label})")
+            all_annotated.append((str(self.annotated_image_path), cap))
+        # Add additional video frames
+        for fpath, flabel in self.annotated_frames:
+            if Path(fpath).exists() and fpath != str(self.annotated_image_path):
+                ll = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
+                all_annotated.append((fpath, f"{flabel}. ({ll})"))
+
+        if all_annotated:
+            self._section_header(pdf, "ANNOTATED FRAMES" if len(all_annotated) > 1 else "ANNOTATED IMAGE")
+            img_w = 170
+            img_max_h = 100  # uniform max height
+            for ann_path, caption in all_annotated:
+                if not Path(ann_path).exists():
+                    continue
                 try:
                     h = self._place_image(pdf, ann_path, x=20, y=pdf.get_y(), w=img_w, max_h=img_max_h)
-                    pdf.set_y(pdf.get_y() + 6)
+                    pdf.set_y(pdf.get_y() + 4)
+                    pdf.set_font("Helvetica", "", 8)
+                    pdf.set_text_color(100, 110, 120)
+                    pdf.multi_cell(180, 4.5, caption)
+                    pdf.ln(4)
                 except Exception:
                     pass
-                total_det = s.get("total_detections", 0)
-                label_label = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
-                if is_image:
-                    caption = (f"Annotated image with #ID class conf% labels for {total_det} detection(s). "
-                               f"({label_label})")
-                else:
-                    caption = (f"Peak threat frame - annotated with #ID class conf% labels for {total_det} detection(s). "
-                               f"({label_label})")
-                pdf.set_font("Helvetica", "", 8)
-                pdf.set_text_color(100, 110, 120)
-                pdf.multi_cell(180, 4.5, caption)
-                pdf.ln(2)
 
         # ============================================================
         # Track Chart + Confidence Histogram (flows after vessel table)
