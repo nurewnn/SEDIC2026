@@ -376,12 +376,14 @@ class ReportGenerator:
         pdf.cell(0, 5, meta)
         # Executive Summary
         self._section_header(pdf, "EXECUTIVE SUMMARY", y=60)
+        pdf.ln(4)  # gap between header and summary text
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(50, 55, 65)
         pdf.multi_cell(180, 6, summary)
-        pdf.ln(5)
+        pdf.ln(8)
         # Key Metrics (single-column list, readable)
         self._section_header(pdf, "KEY METRICS")
+        pdf.ln(4)  # gap between header and metrics table
         avg_str = f"{s.get('avg_confidence', 0):.1%}" if isinstance(s.get("avg_confidence"), (int, float)) else "N/A"
         min_str = f"{s.get('min_confidence', 0):.1%}" if isinstance(s.get("min_confidence"), (int, float)) else "N/A"
         max_str = f"{s.get('max_confidence', 0):.1%}" if isinstance(s.get("max_confidence"), (int, float)) else "N/A"
