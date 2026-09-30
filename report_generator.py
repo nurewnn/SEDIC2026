@@ -1185,21 +1185,22 @@ class ReportGenerator:
         # For image mode: single annotated image
         # For video mode: up to 3 key frames (first, peak, last)
         all_annotated = []
-        if self.annotated_image_path and Path(str(self.annotated_image_path)).exists():
-            total_det = s.get("total_detections", 0)
-            label_label = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
-            if is_image:
-                cap = (f"Annotated image with #ID class conf% labels for {total_det} detection(s). "
-                       f"({label_label})")
-            else:
-                cap = (f"Peak threat frame - annotated with #ID class conf% labels for {total_det} detection(s). "
-                       f"({label_label})")
-            all_annotated.append((str(self.annotated_image_path), cap))
-        # Add additional video frames
-        for fpath, flabel in self.annotated_frames:
-            if Path(fpath).exists() and fpath != str(self.annotated_image_path):
-                ll = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
-                all_annotated.append((fpath, f"{flabel}. ({ll})"))
+        ll = "AI-generated" if self.use_llm else "Template (LLM unavailable)"
+        if is_image:
+            if self.annotated_image_path and Path(str(self.annotated_image_path)).exists():
+                total_det = s.get("total_detections", 0)
+                cap = (f"Annotated image with #ID class conf% labels for {total_det} detection(s). ({ll})")
+                all_annotated.append((str(self.annotated_image_path), cap))
+        else:
+            # Video mode: use annotated_frames list (each has its own label)
+            for fpath, flabel in self.annotated_frames:
+                if Path(fpath).exists():
+                    all_annotated.append((fpath, f"{flabel}. ({ll})"))
+            # Fallback: if no annotated_frames but annotated_image_path exists
+            if not all_annotated and self.annotated_image_path and Path(str(self.annotated_image_path)).exists():
+                total_det = s.get("total_detections", 0)
+                cap = (f"Peak threat frame - annotated with #ID class conf% labels for {total_det} detection(s). ({ll})")
+                all_annotated.append((str(self.annotated_image_path), cap))
 
         if all_annotated:
             self._section_header(pdf, "ANNOTATED FRAMES" if len(all_annotated) > 1 else "ANNOTATED IMAGE")
