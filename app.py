@@ -755,7 +755,7 @@ with sidebar_col:
         mode = st.session_state.detect_mode
         st.markdown("---")
         st.markdown('<div class="sb-section-label">Model Confidence Threshold</div>', unsafe_allow_html=True)
-        conf_thresh = st.slider("Confidence threshold", 0.01, 0.95, 0.25, 0.01, label_visibility="collapsed")
+        conf_thresh = st.slider("Confidence threshold", 0.01, 0.95, 0.15, 0.01, label_visibility="collapsed")
         st.markdown(f'<div class="threshold-label">Threshold: <span class="threshold-value">{conf_thresh:.0%}</span></div>', unsafe_allow_html=True)
 
         # Alert mute section
@@ -1372,6 +1372,7 @@ with content_col:
 
             # Peak-threat tracking (used for final display + incident report)
             peak_score, peak_detections, peak_rgb, peak_frame_id = -1, [], None, None
+            all_peak_frames = []
             threat_timeline = []   # (frame_id, class_name, threat_level, confidence)
 
             st.session_state.last_threat_level = None
@@ -1407,7 +1408,6 @@ with content_col:
                     frame = None
                 if not ret:
                     break
-
                 if frame_id % skip == 0:
                     t0 = time.perf_counter()
                     detections = detector.track(frame)
@@ -1441,6 +1441,11 @@ with content_col:
                     if score > peak_score:
                         peak_score, peak_detections = score, detections
                         peak_rgb, peak_frame_id = annotated_rgb, frame_id
+                        
+                    if score >= 50:
+                        if not all_peak_frames or (frame_id - all_peak_frames[-1][0]) > fps * 3:
+                            if len(all_peak_frames) < 10:
+                                all_peak_frames.append((frame_id, annotated_rgb, score))
 
                     # Track first and last annotated frames for the report
                     if first_annotated_rgb is None and detections:
@@ -1527,10 +1532,22 @@ with content_col:
                 p1 = "outputs/annotated/frame_first.png"
                 cv2.imwrite(p1, cv2.cvtColor(first_annotated_rgb, cv2.COLOR_RGB2BGR))
                 annotated_frames.append((p1, f"First detection frame (#{first_annotated_frame_id})"))
-            if peak_rgb is not None:
+                
+            # Sort peak frames to prioritize highest threats (e.g. foreign military) first
+            all_peak_frames = sorted(all_peak_frames, key=lambda x: (-x[2], x[0]))
+
+            for idx, (pf_id, p_rgb, p_score) in enumerate(all_peak_frames):
+                p_path = f"outputs/annotated/frame_peak_{idx}.png"
+                cv2.imwrite(p_path, cv2.cvtColor(p_rgb, cv2.COLOR_RGB2BGR))
+                # Add threat context to the label if it's very high
+                threat_tag = " (Critical Threat)" if p_score >= 100 else ""
+                annotated_frames.append((p_path, f"Peak threat frame #{pf_id}{threat_tag}"))
+                
+            if not all_peak_frames and peak_rgb is not None:
                 p2 = "outputs/annotated/frame_peak.png"
                 cv2.imwrite(p2, cv2.cvtColor(peak_rgb, cv2.COLOR_RGB2BGR))
-                annotated_frames.append((p2, f"Peak threat frame (#{peak_frame_id})"))
+                annotated_frames.append((p2, f"Peak activity frame (#{peak_frame_id})"))
+
             if last_annotated_rgb is not None and last_annotated_frame_id != first_annotated_frame_id:
                 p3 = "outputs/annotated/frame_last.png"
                 cv2.imwrite(p3, cv2.cvtColor(last_annotated_rgb, cv2.COLOR_RGB2BGR))

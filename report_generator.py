@@ -805,6 +805,11 @@ class ReportGenerator:
         # Gap before the section (unless we're at the top of a page)
         if pdf.get_y() > 25:
             pdf.ln(8)
+            
+        # Check if we need a page break (heuristic: 30mm for header + some content)
+        if pdf.get_y() > pdf.h - pdf.b_margin - 30:
+            pdf.add_page()
+            
         if y is not None:
             pdf.set_xy(15, y)
         else:
@@ -843,6 +848,12 @@ class ReportGenerator:
         if max_h is not None and h > max_h:
             h = max_h
             w = h / aspect if aspect > 0 else w
+            
+        # Check if image goes past the bottom margin
+        if y + h > pdf.h - pdf.b_margin:
+            pdf.add_page()
+            y = pdf.get_y()
+            
         pdf.image(path, x=x, y=y, w=w)
         pdf.set_xy(x, y + h)
         return h
@@ -1204,20 +1215,50 @@ class ReportGenerator:
 
         if all_annotated:
             self._section_header(pdf, "ANNOTATED FRAMES" if len(all_annotated) > 1 else "ANNOTATED IMAGE")
-            img_w = 170
-            img_max_h = 100  # uniform max height
-            for ann_path, caption in all_annotated:
-                if not Path(ann_path).exists():
-                    continue
-                try:
-                    h = self._place_image(pdf, ann_path, x=20, y=pdf.get_y(), w=img_w, max_h=img_max_h)
-                    pdf.set_y(pdf.get_y() + 4)
-                    pdf.set_font("Helvetica", "", 8)
-                    pdf.set_text_color(100, 110, 120)
-                    pdf.multi_cell(180, 4.5, caption)
-                    pdf.ln(4)
-                except Exception:
-                    pass
+            
+            if len(all_annotated) == 1:
+                img_w = 170
+                img_max_h = 100
+                ann_path, caption = all_annotated[0]
+                if Path(ann_path).exists():
+                    try:
+                        h = self._place_image(pdf, ann_path, x=20, y=pdf.get_y(), w=img_w, max_h=img_max_h)
+                        pdf.set_y(pdf.get_y() + 4)
+                        pdf.set_font("Helvetica", "", 8)
+                        pdf.set_text_color(100, 110, 120)
+                        pdf.multi_cell(180, 4.5, caption)
+                        pdf.ln(4)
+                    except Exception:
+                        pass
+            else:
+                img_w = 85
+                img_max_h = 60
+                row_y = pdf.get_y()
+                max_row_y = row_y
+                valid_images = [a for a in all_annotated if Path(a[0]).exists()]
+                for idx, (ann_path, caption) in enumerate(valid_images):
+                    col = idx % 2
+                    if col == 0 and idx > 0:
+                        row_y = max_row_y + 4
+                        pdf.set_y(row_y)
+                    
+                    x = 15 + col * (img_w + 5)
+                    try:
+                        # Pre-check page break for new rows
+                        if col == 0 and row_y + img_max_h + 15 > pdf.h - pdf.b_margin:
+                            pdf.add_page()
+                            row_y = pdf.get_y()
+                            max_row_y = row_y
+                            
+                        h = self._place_image(pdf, ann_path, x=x, y=row_y, w=img_w, max_h=img_max_h)
+                        pdf.set_xy(x, row_y + h + 1)
+                        pdf.set_font("Helvetica", "", 8)
+                        pdf.set_text_color(100, 110, 120)
+                        pdf.multi_cell(img_w, 4.5, caption, align="C")
+                        max_row_y = max(max_row_y, pdf.get_y())
+                    except Exception:
+                        pass
+                pdf.set_y(max_row_y + 4)
 
         # ============================================================
         # Track Chart + Confidence Histogram (flows after vessel table)

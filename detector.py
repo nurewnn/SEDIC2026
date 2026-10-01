@@ -14,7 +14,6 @@ from ultralytics import YOLO
 from utils.colours import THREAT_COLOURS, THREAT_LEVEL
 import cv2, numpy as np
 
-
 class GuardianDetector:
     def __init__(self, model_path: str, conf: float = 0.25):
         self.model = YOLO(model_path)
@@ -31,6 +30,7 @@ class GuardianDetector:
             frame,
             conf=self.conf if conf is None else conf,
             iou=0.5,        # suppress double detections on same vessel
+            imgsz=1280,
             verbose=False,
         )[0]
 
@@ -45,49 +45,49 @@ class GuardianDetector:
                 "bbox":         (x1, y1, x2, y2),
                 "colour":       THREAT_COLOURS.get(cls_name, (180, 180, 180)),
                 "threat_level": THREAT_LEVEL.get(cls_name, "UNKNOWN"),
-                "vessel_id":    idx,   # sequential fallback (no tracker)
+                "vessel_id":    cls_id,   # fallback to class_id so Gantt groups by class
             })
         return detections
 
     def track(self, frame: np.ndarray, conf: float | None = None) -> list[dict]:
         """
         Returns a list of detection dicts WITH persistent object tracking.
-        Uses Ultralytics built-in ByteTrack (no extra dependencies).
-        Each dict: {class_name, confidence, bbox, colour, threat_level, vessel_id}
-        vessel_id is the tracker-assigned persistent ID (stable across frames).
-
-        Call reset_tracker() before starting a new video/session.
+        Uses Ultralytics built-in ByteTrack. If it fails, falls back to predict().
         """
-        results = self.model.track(
-            frame,
-            conf=self.conf if conf is None else conf,
-            iou=0.5,
-            persist=True,       # keep tracker state across frames
-            verbose=False,
-        )[0]
+        try:
+            results = self.model.track(
+                frame,
+                conf=self.conf if conf is None else conf,
+                iou=0.5,
+                persist=True,
+                imgsz=1280,
+                verbose=False,
+            )[0]
+            
+            detections = []
+            if results.boxes is None or results.boxes.id is None:
+                return detections
 
-        detections = []
-        if results.boxes is None or results.boxes.id is None:
+            for box in results.boxes:
+                cls_id   = int(box.cls[0])
+                cls_name = self.model.names[cls_id]
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                track_id = int(box.id[0])
+                detections.append({
+                    "class_name":   cls_name,
+                    "confidence":   round(float(box.conf[0]), 3),
+                    "bbox":         (x1, y1, x2, y2),
+                    "colour":       THREAT_COLOURS.get(cls_name, (180, 180, 180)),
+                    "threat_level": THREAT_LEVEL.get(cls_name, "UNKNOWN"),
+                    "vessel_id":    track_id,
+                })
             return detections
-
-        for box in results.boxes:
-            cls_id   = int(box.cls[0])
-            cls_name = self.model.names[cls_id]
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            track_id  = int(box.id[0])   # persistent tracker ID
-            detections.append({
-                "class_name":   cls_name,
-                "confidence":   round(float(box.conf[0]), 3),
-                "bbox":         (x1, y1, x2, y2),
-                "colour":       THREAT_COLOURS.get(cls_name, (180, 180, 180)),
-                "threat_level": THREAT_LEVEL.get(cls_name, "UNKNOWN"),
-                "vessel_id":    track_id,
-            })
-        return detections
+        except Exception:
+            return self.predict(frame, conf)
 
     def reset_tracker(self):
         """Reset the tracking state for a new session."""
-        self.model.predictor = None  # forces fresh tracker init on next track()
+        self.model.predictor = None
 
     def diagnostics(self, frame: np.ndarray, conf: float = 0.01) -> dict:
         """Returns low-threshold model output for troubleshooting."""
